@@ -5,8 +5,9 @@ services:
   origin:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    command: ["npm", "run", "start:origin"]
+      dockerfile: origin/Dockerfile
+    container_name: cdn-origin
+    command: ["node", "server.js"]
     ports:
       - "8000:8000"
     environment:
@@ -19,12 +20,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    networks:
+      - cdn-network
 
-  # 2. Mumbai Edge Server (Port 8001 - Simulated Latency: 35ms)
+  # 2. Mumbai Edge Server (Port 8001 - Latency: 35ms)
   edge-mumbai:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: edge/Dockerfile
+    container_name: cdn-edge-mumbai
     command: ["node", "edge/edgeServer.js", "--edge=mumbai"]
     ports:
       - "8001:8001"
@@ -33,15 +37,24 @@ services:
       - EDGE_ID=mumbai
       - ORIGIN_URL=http://origin:8000
       - SIMULATED_EDGE_LATENCY_MS=35
+      - NODE_ENV=production
     depends_on:
       origin:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - cdn-network
 
-  # 3. Singapore Edge Server (Port 8002 - Simulated Latency: 80ms)
+  # 3. Singapore Edge Server (Port 8002 - Latency: 80ms)
   edge-singapore:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: edge/Dockerfile
+    container_name: cdn-edge-singapore
     command: ["node", "edge/edgeServer.js", "--edge=singapore"]
     ports:
       - "8002:8002"
@@ -50,15 +63,24 @@ services:
       - EDGE_ID=singapore
       - ORIGIN_URL=http://origin:8000
       - SIMULATED_EDGE_LATENCY_MS=80
+      - NODE_ENV=production
     depends_on:
       origin:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8002/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - cdn-network
 
-  # 4. Frankfurt Edge Server (Port 8003 - Simulated Latency: 150ms)
+  # 4. Frankfurt Edge Server (Port 8003 - Latency: 150ms)
   edge-frankfurt:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: edge/Dockerfile
+    container_name: cdn-edge-frankfurt
     command: ["node", "edge/edgeServer.js", "--edge=frankfurt"]
     ports:
       - "8003:8003"
@@ -67,15 +89,24 @@ services:
       - EDGE_ID=frankfurt
       - ORIGIN_URL=http://origin:8000
       - SIMULATED_EDGE_LATENCY_MS=150
+      - NODE_ENV=production
     depends_on:
       origin:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8003/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - cdn-network
 
-  # 5. New York Edge Server (Port 8004 - Simulated Latency: 180ms)
+  # 5. New York Edge Server (Port 8004 - Latency: 180ms)
   edge-newyork:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: edge/Dockerfile
+    container_name: cdn-edge-newyork
     command: ["node", "edge/edgeServer.js", "--edge=newyork"]
     ports:
       - "8004:8004"
@@ -84,35 +115,54 @@ services:
       - EDGE_ID=newyork
       - ORIGIN_URL=http://origin:8000
       - SIMULATED_EDGE_LATENCY_MS=180
+      - NODE_ENV=production
     depends_on:
       origin:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8004/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - cdn-network
 
   # 6. Central CDN Router & Telemetry Engine (Port 9000)
   router:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    command: ["npm", "run", "start:router"]
+      dockerfile: router/Dockerfile
+    container_name: cdn-router
+    command: ["node", "router/routerServer.js"]
     ports:
       - "9000:9000"
     environment:
       - ROUTER_PORT=9000
+      - ORIGIN_URL=http://origin:8000
       - EDGE_MUMBAI_URL=http://edge-mumbai:8001
       - EDGE_SINGAPORE_URL=http://edge-singapore:8002
       - EDGE_FRANKFURT_URL=http://edge-frankfurt:8003
       - EDGE_NEWYORK_URL=http://edge-newyork:8004
+      - NODE_ENV=production
     depends_on:
       - edge-mumbai
       - edge-singapore
       - edge-frankfurt
       - edge-newyork
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - cdn-network
 
   # 7. React Telemetry Dashboard (Port 5173)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: cdn-frontend
     ports:
       - "5173:5173"
     environment:
@@ -121,3 +171,9 @@ services:
       - VITE_ORIGIN_URL=http://localhost:8000
     depends_on:
       - router
+    networks:
+      - cdn-network
+
+networks:
+  cdn-network:
+    driver: bridge
