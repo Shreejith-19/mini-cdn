@@ -511,9 +511,7 @@ export default function OverviewPage() {
       {/* Interactive Traffic Sandbox                              */}
       {/* Allows testing live requests directly on Overview page   */}
       {/* ======================================================== */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <RequestSimulator originFiles={originFiles} onActionSuccess={refresh} />
-      </div>
+      <RequestSimulator originFiles={originFiles} onActionSuccess={refresh} />
     </div>
   );
 }

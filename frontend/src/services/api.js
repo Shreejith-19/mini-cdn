@@ -160,19 +160,36 @@ export async function clearAllEdgeCaches() {
 
 /**
  * Execute a simulated CDN request through the central router
+ * @param {string} filename - Target asset filename
+ * @param {Object} [options] - Optional routing config { strategy: 'ROUND_ROBIN' | 'LOWEST_LATENCY', requestId: string }
  */
-export async function executeCdnRequest(filename) {
+export async function executeCdnRequest(filename, options = {}) {
   const start = performance.now();
-  const url = `${ROUTER_URL}/cdn/content/${encodeURIComponent(filename)}`;
+  const queryParams = new URLSearchParams();
+  if (options.strategy) {
+    queryParams.set('strategy', options.strategy);
+  }
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  const url = `${ROUTER_URL}/cdn/content/${encodeURIComponent(filename)}${queryString}`;
 
-  const res = await fetch(url);
+  const headers = {};
+  if (options.strategy) {
+    headers['X-Routing-Strategy'] = options.strategy;
+  }
+  if (options.requestId) {
+    headers['X-Request-Id'] = options.requestId;
+  }
+
+  const res = await fetch(url, { headers });
   const duration = Math.round(performance.now() - start);
 
+  const requestId = res.headers.get('x-request-id') || options.requestId || `req-${Date.now()}`;
   const selectedEdge = res.headers.get('x-selected-edge') || 'Unknown';
   const simulatedLatency = res.headers.get('x-edge-simulated-latency') || '0ms';
   const actualDuration = res.headers.get('x-actual-request-duration') || `${duration}ms`;
-  const strategy = res.headers.get('x-routing-strategy') || 'Unknown';
+  const strategy = res.headers.get('x-routing-strategy') || options.strategy || 'ROUND_ROBIN';
   const cacheStatus = res.headers.get('x-cache') || 'UNKNOWN';
+  const originContacted = res.headers.get('x-origin-contacted') || (cacheStatus === 'MISS' ? 'Yes' : 'No');
   const contentType = res.headers.get('content-type') || 'text/plain';
   const etag = res.headers.get('etag') || 'N/A';
   const edgePort = res.headers.get('x-edge-port') || '';
@@ -187,6 +204,8 @@ export async function executeCdnRequest(filename) {
   return {
     success: res.ok,
     status: res.status,
+    statusCode: res.status,
+    requestId,
     url,
     filename,
     selectedEdge,
@@ -194,8 +213,10 @@ export async function executeCdnRequest(filename) {
     simulatedLatency,
     actualDuration,
     clientDurationMs: duration,
+    latencyMs: duration,
     strategy,
     cacheStatus,
+    originContacted,
     contentType,
     etag,
     body
@@ -217,6 +238,9 @@ export async function executeDirectEdgeRequest(port, filename) {
   const contentType = res.headers.get('content-type') || 'text/plain';
   const etag = res.headers.get('etag') || 'N/A';
 
+  const originContacted = res.headers.get('x-origin-contacted') || (cacheStatus === 'MISS' ? 'Yes' : 'No');
+  const requestId = res.headers.get('x-request-id') || `req-direct-${Date.now()}`;
+
   let body = '';
   if (contentType.includes('json') || contentType.includes('text') || contentType.includes('svg')) {
     body = await res.text();
@@ -227,11 +251,17 @@ export async function executeDirectEdgeRequest(port, filename) {
   return {
     success: res.ok,
     status: res.status,
+    statusCode: res.status,
+    requestId,
+    filename,
+    selectedEdge: cacheEdge,
     url,
     port,
     durationMs: duration,
+    latencyMs: duration,
     cacheStatus,
     cacheEdge,
+    originContacted,
     contentType,
     etag,
     body

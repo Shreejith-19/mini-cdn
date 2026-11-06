@@ -31,7 +31,19 @@ export function createEdgeApp(customConfig = {}) {
   app.set('view engine', 'ejs');
   app.set('views', path.resolve(__dirname, '../views'));
 
-  app.use(cors());
+  app.use(cors({
+    origin: '*',
+    exposedHeaders: [
+      'X-Cache',
+      'X-Cache-Edge',
+      'X-Edge-Latency',
+      'X-Origin-Contacted',
+      'X-Request-Id',
+      'Content-Type',
+      'ETag',
+      'Content-Length'
+    ]
+  }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
@@ -171,6 +183,7 @@ export function createEdgeApp(customConfig = {}) {
       res.setHeader('X-Cache', 'HIT');
       res.setHeader('X-Cache-Edge', config.name);
       res.setHeader('X-Edge-Latency', `${duration}ms`);
+      res.setHeader('X-Origin-Contacted', 'No');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
       recordRecentRequest({
@@ -256,6 +269,7 @@ export function createEdgeApp(customConfig = {}) {
       res.setHeader('X-Cache', 'MISS');
       res.setHeader('X-Cache-Edge', config.name);
       res.setHeader('X-Edge-Latency', `${duration}ms`);
+      res.setHeader('X-Origin-Contacted', 'Yes');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
       recordRecentRequest({

@@ -25,7 +25,7 @@ export function createRouterApp(customConfig = {}) {
 
   // Edge server definitions with required initial simulated latency values:
   // Mumbai: 35 ms, Singapore: 80 ms, Frankfurt: 150 ms, New York: 180 ms
-  const edges = [
+  const edges = customConfig.edges || [
     {
       id: 'mumbai',
       name: 'Mumbai Edge',
@@ -92,7 +92,22 @@ export function createRouterApp(customConfig = {}) {
   const routingDecisions = [];
 
   // Middleware
-  app.use(cors());
+  app.use(cors({
+    origin: '*',
+    exposedHeaders: [
+      'X-Request-Id',
+      'X-Selected-Edge',
+      'X-Edge-Simulated-Latency',
+      'X-Actual-Request-Duration',
+      'X-Routing-Strategy',
+      'X-Cache',
+      'X-Origin-Contacted',
+      'X-Edge-Port',
+      'Content-Type',
+      'ETag',
+      'Content-Length'
+    ]
+  }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
@@ -186,7 +201,8 @@ export function createRouterApp(customConfig = {}) {
    * Selects an edge server based on active routing strategy.
    * NEVER routes new requests to unhealthy or administratively disabled edges.
    */
-  function selectEdge() {
+  function selectEdge(strategyOverride = null) {
+    const activeStrategy = strategyOverride || currentStrategy;
     // Only route to edges that are HEALTHY and NOT administratively disabled
     const availableEdges = edges.filter(e => !e.disabled && e.status === 'HEALTHY');
 
@@ -194,7 +210,7 @@ export function createRouterApp(customConfig = {}) {
       return null;
     }
 
-    if (currentStrategy === STRATEGIES.LOWEST_LATENCY) {
+    if (activeStrategy === STRATEGIES.LOWEST_LATENCY) {
       // Pick available edge with lowest configured simulatedLatencyMs
       let lowest = availableEdges[0];
       for (const edge of availableEdges) {
@@ -357,14 +373,28 @@ export function createRouterApp(customConfig = {}) {
     const requestStart = Date.now();
     const safeFilename = path.basename(req.params.filename);
 
-    const selectedEdge = selectEdge();
+    // Support dynamic strategy per request via query parameter or header
+    const requestedStrategy = req.query.strategy || req.headers['x-routing-strategy'];
+    let effectiveStrategy = currentStrategy;
+    if (requestedStrategy) {
+      const normalized = String(requestedStrategy).trim().toUpperCase();
+      if (normalized === STRATEGIES.ROUND_ROBIN || normalized === STRATEGIES.LOWEST_LATENCY) {
+        effectiveStrategy = normalized;
+      }
+    }
+
+    // Generate or propagate consistent Request ID
+    const requestId = req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const selectedEdge = selectEdge(effectiveStrategy);
 
     // Meaningful error if all edges are unavailable
     if (!selectedEdge) {
       const actualDurationMs = Date.now() - requestStart;
       recordDecision({
+        id: requestId,
         file: safeFilename,
-        strategy: currentStrategy,
+        strategy: effectiveStrategy,
         selectedEdge: 'NONE',
         edgePort: null,
         simulatedLatencyMs: 0,
@@ -374,6 +404,7 @@ export function createRouterApp(customConfig = {}) {
       });
 
       collector.recordRequest({
+        requestId,
         filename: safeFilename,
         edgeId: null,
         edgeName: 'None',
@@ -383,10 +414,15 @@ export function createRouterApp(customConfig = {}) {
         bytes: 0
       });
 
+      res.setHeader('X-Request-Id', requestId);
+      res.setHeader('X-Routing-Strategy', effectiveStrategy);
+      res.setHeader('X-Origin-Contacted', 'No');
+
       return res.status(503).json({
         error: 'Service Unavailable: All edge servers are currently unavailable',
+        requestId,
         routerPort: PORT,
-        strategy: currentStrategy,
+        strategy: effectiveStrategy,
         availableHealthyEdges: 0
       });
     }
@@ -403,29 +439,34 @@ export function createRouterApp(customConfig = {}) {
         signal: controller.signal,
         headers: {
           'X-Forwarded-For': req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1',
-          'If-None-Match': req.headers['if-none-match'] || ''
+          'If-None-Match': req.headers['if-none-match'] || '',
+          'X-Request-Id': requestId
         }
       });
       clearTimeout(timeoutId);
 
       const actualDurationMs = Date.now() - requestStart;
       const cacheStatus = edgeRes.headers.get('x-cache') || 'UNKNOWN';
+      const originContacted = cacheStatus === 'MISS' ? 'Yes' : 'No';
 
       // Record routing decision
       recordDecision({
+        id: requestId,
         file: safeFilename,
-        strategy: currentStrategy,
+        strategy: effectiveStrategy,
         selectedEdge: selectedEdge.name,
         edgePort: selectedEdge.port,
         simulatedLatencyMs: selectedEdge.simulatedLatencyMs,
         actualDurationMs,
         cacheStatus,
+        originContacted,
         status: edgeRes.status
       });
 
       // Pass-through conditional 304 Not Modified
       if (edgeRes.status === 304) {
         collector.recordRequest({
+          requestId,
           filename: safeFilename,
           edgeId: selectedEdge.id,
           edgeName: selectedEdge.name,
@@ -435,10 +476,13 @@ export function createRouterApp(customConfig = {}) {
           bytes: 0
         });
 
+        res.setHeader('X-Request-Id', requestId);
         res.setHeader('X-Selected-Edge', selectedEdge.name);
         res.setHeader('X-Edge-Simulated-Latency', `${selectedEdge.simulatedLatencyMs}ms`);
         res.setHeader('X-Actual-Request-Duration', `${actualDurationMs}ms`);
-        res.setHeader('X-Routing-Strategy', currentStrategy);
+        res.setHeader('X-Routing-Strategy', effectiveStrategy);
+        res.setHeader('X-Cache', 'HIT');
+        res.setHeader('X-Origin-Contacted', 'No');
         return res.status(304).end();
       }
 
@@ -448,6 +492,7 @@ export function createRouterApp(customConfig = {}) {
         const errBytes = Buffer.byteLength(errorText || '');
 
         collector.recordRequest({
+          requestId,
           filename: safeFilename,
           edgeId: selectedEdge.id,
           edgeName: selectedEdge.name,
@@ -457,10 +502,12 @@ export function createRouterApp(customConfig = {}) {
           bytes: errBytes
         });
 
+        res.setHeader('X-Request-Id', requestId);
         res.setHeader('X-Selected-Edge', selectedEdge.name);
         res.setHeader('X-Edge-Simulated-Latency', `${selectedEdge.simulatedLatencyMs}ms`);
         res.setHeader('X-Actual-Request-Duration', `${actualDurationMs}ms`);
-        res.setHeader('X-Routing-Strategy', currentStrategy);
+        res.setHeader('X-Routing-Strategy', effectiveStrategy);
+        res.setHeader('X-Origin-Contacted', originContacted);
         return res.status(edgeRes.status).send(errorText);
       }
 
@@ -468,6 +515,7 @@ export function createRouterApp(customConfig = {}) {
       const buffer = Buffer.from(arrayBuffer);
 
       collector.recordRequest({
+        requestId,
         filename: safeFilename,
         edgeId: selectedEdge.id,
         edgeName: selectedEdge.name,
@@ -478,11 +526,13 @@ export function createRouterApp(customConfig = {}) {
       });
 
       // Metadata headers clearly distinguishing simulated routing latency from actual duration
+      res.setHeader('X-Request-Id', requestId);
       res.setHeader('X-Selected-Edge', selectedEdge.name);
       res.setHeader('X-Edge-Simulated-Latency', `${selectedEdge.simulatedLatencyMs}ms`);
       res.setHeader('X-Actual-Request-Duration', `${actualDurationMs}ms`);
-      res.setHeader('X-Routing-Strategy', currentStrategy);
+      res.setHeader('X-Routing-Strategy', effectiveStrategy);
       res.setHeader('X-Edge-Port', selectedEdge.port);
+      res.setHeader('X-Origin-Contacted', originContacted);
 
       // Forward caching & content headers
       if (edgeRes.headers.get('x-cache')) res.setHeader('X-Cache', edgeRes.headers.get('x-cache'));
@@ -502,17 +552,20 @@ export function createRouterApp(customConfig = {}) {
 
       const actualDurationMs = Date.now() - requestStart;
       recordDecision({
+        id: requestId,
         file: safeFilename,
-        strategy: currentStrategy,
+        strategy: effectiveStrategy,
         selectedEdge: selectedEdge.name,
         edgePort: selectedEdge.port,
         simulatedLatencyMs: selectedEdge.simulatedLatencyMs,
         actualDurationMs,
         status: 504,
+        originContacted: 'No',
         error: err.message
       });
 
       collector.recordRequest({
+        requestId,
         filename: safeFilename,
         edgeId: selectedEdge.id,
         edgeName: selectedEdge.name,
@@ -522,10 +575,18 @@ export function createRouterApp(customConfig = {}) {
         bytes: 0
       });
 
+      res.setHeader('X-Request-Id', requestId);
+      res.setHeader('X-Selected-Edge', selectedEdge.name);
+      res.setHeader('X-Edge-Simulated-Latency', `${selectedEdge.simulatedLatencyMs}ms`);
+      res.setHeader('X-Actual-Request-Duration', `${actualDurationMs}ms`);
+      res.setHeader('X-Routing-Strategy', effectiveStrategy);
+      res.setHeader('X-Origin-Contacted', 'No');
+
       return res.status(504).json({
-        error: `Edge server timeout: Failed to connect to ${selectedEdge.name} (Port :${selectedEdge.port})`,
-        selectedEdge: selectedEdge.name,
-        details: err.message
+        error: `Gateway Timeout: Edge "${selectedEdge.name}" failed to respond`,
+        requestId,
+        edge: selectedEdge.name,
+        port: selectedEdge.port
       });
     }
   };

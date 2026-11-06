@@ -86,10 +86,8 @@ export default function RequestsPage() {
         </div>
       </div>
 
-      {/* Interactive Traffic Dispatch Sandbox */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <RequestSimulator originFiles={originFiles} onActionSuccess={refresh} />
-      </div>
+      {/* Interactive Request Simulator Section */}
+      <RequestSimulator originFiles={originFiles} onActionSuccess={refresh} />
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
