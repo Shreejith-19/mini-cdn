@@ -36,3 +36,4 @@ export function useCdnData(intervalMs = 3000) {
     setAutoRefresh
   };
 }
+

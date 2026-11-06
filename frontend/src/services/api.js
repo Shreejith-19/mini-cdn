@@ -39,7 +39,7 @@ export async function fetchOriginData() {
 }
 
 /**
- * Fetch router configuration and edge statuses
+ * Fetch router configuration, edges, and decision log
  */
 export async function fetchRouterData() {
   try {
@@ -87,6 +87,28 @@ export async function updateRouterStrategy(strategy) {
     throw new Error(data.error || 'Failed to update routing strategy');
   }
 
+  return await res.json();
+}
+
+/**
+ * Administrative failure simulation: mark an edge offline
+ */
+export async function simulateEdgeFailure(edgeId) {
+  const res = await fetch(`${ROUTER_URL}/admin/edges/${edgeId}/failure`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error(`Failed to simulate failure for edge ${edgeId}`);
+  return await res.json();
+}
+
+/**
+ * Administrative failure simulation: recover an edge online
+ */
+export async function recoverEdge(edgeId) {
+  const res = await fetch(`${ROUTER_URL}/admin/edges/${edgeId}/recover`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error(`Failed to recover edge ${edgeId}`);
   return await res.json();
 }
 
