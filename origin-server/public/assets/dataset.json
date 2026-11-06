@@ -1,0 +1,20 @@
+{
+  "project": "Mini CDN Simulator",
+  "version": "1.0.0",
+  "originRegion": "Central Cloud (Frankfurt)",
+  "nodes": [
+    { "id": "edge-bom", "name": "Mumbai Edge", "port": 8001, "region": "Asia-South" },
+    { "id": "edge-sin", "name": "Singapore Edge", "port": 8002, "region": "Asia-Southeast" },
+    { "id": "edge-fra", "name": "Frankfurt Edge", "port": 8003, "region": "Europe-Central" },
+    { "id": "edge-nyc", "name": "New York Edge", "port": 8004, "region": "US-East" }
+  ],
+  "features": [
+    "Edge In-Memory Caching",
+    "Intelligent Geo Routing",
+    "Real-time Cache Hit/Miss Metrics",
+    "Origin Latency Offloading",
+    "Instant Invalidation / Purge"
+  ],
+  "timestamp": "2026-11-06T15:00:00.000Z"
+}
+

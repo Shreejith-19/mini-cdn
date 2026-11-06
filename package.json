@@ -1,0 +1,13 @@
+{
+  "name": "mini-cdn",
+  "version": "1.0.0",
+  "description": "Mini CDN Simulator - Demonstrating Edge Caching, Intelligent Routing and Performance Monitoring",
+  "type": "module",
+  "scripts": {
+    "start:origin": "node origin-server/src/server.js",
+    "test:origin": "node origin-server/tests/origin.test.js"
+  },
+  "keywords": ["cdn", "edge-computing", "caching", "intelligent-routing", "simulator"],
+  "license": "MIT"
+}
+
