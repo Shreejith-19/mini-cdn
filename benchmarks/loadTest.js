@@ -47,6 +47,8 @@ export async function runScenarioBenchmarks(testOptions = {}) {
   const duration = testOptions.duration || 3;
   const connections = testOptions.connections || 10;
   const filename = testOptions.filename || 'sample.txt';
+  const targetOrigin = testOptions.originUrl || ORIGIN_URL;
+  const targetRouter = testOptions.routerUrl || ROUTER_URL;
 
   console.log('\n======================================================');
   console.log('⚡ Mini CDN Autocannon Performance Benchmark Suite');
@@ -56,8 +58,8 @@ export async function runScenarioBenchmarks(testOptions = {}) {
   // Check if live servers are responding
   let liveServers = false;
   try {
-    const checkOrigin = await fetch(`${ORIGIN_URL}/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null);
-    const checkRouter = await fetch(`${ROUTER_URL}/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null);
+    const checkOrigin = await fetch(`${targetOrigin}/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null);
+    const checkRouter = await fetch(`${targetRouter}/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null);
     if (checkOrigin?.ok && checkRouter?.ok) {
       liveServers = true;
     }
@@ -69,12 +71,12 @@ export async function runScenarioBenchmarks(testOptions = {}) {
     console.log('📡 Live servers detected! Executing real Autocannon load tests against backend...\n');
 
     // Prime cache on Router for Scenario 3
-    await fetch(`${ROUTER_URL}/cdn/content/${encodeURIComponent(filename)}?strategy=LOWEST_LATENCY`).catch(() => {});
+    await fetch(`${targetRouter}/cdn/content/${encodeURIComponent(filename)}?strategy=LOWEST_LATENCY`).catch(() => {});
 
     // Scenario 1: Direct Origin Request
     console.log('⏳ Running Scenario 1: Direct Origin Request (Bypassing CDN)...');
     const s1Raw = await runAutocannon({
-      url: `${ORIGIN_URL}/origin/content/${encodeURIComponent(filename)}`,
+      url: `${targetOrigin}/origin/content/${encodeURIComponent(filename)}`,
       connections,
       duration
     });
@@ -82,7 +84,7 @@ export async function runScenarioBenchmarks(testOptions = {}) {
       id: 'direct-origin',
       name: 'Direct Origin Request',
       description: 'Client connects directly to Origin Storage Server (:8000). Zero edge acceleration.',
-      url: `${ORIGIN_URL}/origin/content/${filename}`,
+      url: `${targetOrigin}/origin/content/${filename}`,
       type: 'BASELINE',
       actualMeasurement: true,
       simulatedLatencyMs: 0,
@@ -102,7 +104,7 @@ export async function runScenarioBenchmarks(testOptions = {}) {
     // Scenario 2: CDN Request with Cache Disabled
     console.log('⏳ Running Scenario 2: CDN Request with Cache Disabled (Forces Origin fetch)...');
     const s2Raw = await runAutocannon({
-      url: `${ROUTER_URL}/cdn/content/${encodeURIComponent(filename)}?nocache=true&strategy=LOWEST_LATENCY`,
+      url: `${targetRouter}/cdn/content/${encodeURIComponent(filename)}?nocache=true&strategy=LOWEST_LATENCY`,
       connections,
       duration,
       headers: { 'X-Cache-Bypass': 'true' }
@@ -111,7 +113,7 @@ export async function runScenarioBenchmarks(testOptions = {}) {
       id: 'cdn-cache-disabled',
       name: 'CDN Request (Cache Disabled)',
       description: 'Routed through CDN Router (:9000) to Edge, but cache is bypassed. Forces Origin roundtrip on every request.',
-      url: `${ROUTER_URL}/cdn/content/${filename}?nocache=true`,
+      url: `${targetRouter}/cdn/content/${filename}?nocache=true`,
       type: 'ROUTED_NO_CACHE',
       actualMeasurement: true,
       simulatedLatencyMs: 35,
@@ -131,15 +133,15 @@ export async function runScenarioBenchmarks(testOptions = {}) {
     // Scenario 3: CDN Request with Cache Enabled
     console.log('⏳ Running Scenario 3: CDN Request with Cache Enabled (Served from LRU RAM)...');
     const s3Raw = await runAutocannon({
-      url: `${ROUTER_URL}/cdn/content/${encodeURIComponent(filename)}?strategy=LOWEST_LATENCY`,
+      url: `${targetRouter}/cdn/content/${encodeURIComponent(filename)}?strategy=LOWEST_LATENCY`,
       connections,
       duration
     });
     scenario3Result = {
       id: 'cdn-cache-enabled',
       name: 'CDN Request (Cache Enabled)',
-      description: 'Routed through CDN Router (:9000) to Mumbai Edge (:8001). Served directly from in-memory LRU cache.',
-      url: `${ROUTER_URL}/cdn/content/${filename}`,
+      description: 'Routed through CDN Router to Edge. Served directly from in-memory LRU cache.',
+      url: `${targetRouter}/cdn/content/${filename}`,
       type: 'OPTIMAL_CDN',
       actualMeasurement: true,
       simulatedLatencyMs: 35,

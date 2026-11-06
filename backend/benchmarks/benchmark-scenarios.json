@@ -1,0 +1,78 @@
+{
+  "timestamp": "2026-11-06T18:28:50.064Z",
+  "tool": "Autocannon v8.0",
+  "durationSeconds": 3,
+  "connections": 10,
+  "scenarios": [
+    {
+      "id": "direct-origin",
+      "name": "Direct Origin Request",
+      "description": "Client connects directly to Origin Storage Server (:8000). Zero edge acceleration.",
+      "url": "http://localhost:8000/origin/content/sample.txt",
+      "type": "BASELINE",
+      "actualMeasurement": true,
+      "simulatedLatencyMs": 0,
+      "averageLatencyMs": 46.2,
+      "p50LatencyMs": 42,
+      "p95LatencyMs": 78.5,
+      "p99LatencyMs": 95,
+      "requestsPerSecond": 215.4,
+      "totalRequests": 646,
+      "totalBytes": 254524,
+      "totalBytesFormatted": "248.56 KB",
+      "throughputBytesPerSec": 84841.3,
+      "cacheStatus": "NONE",
+      "originContacted": true
+    },
+    {
+      "id": "cdn-cache-disabled",
+      "name": "CDN Request (Cache Disabled)",
+      "description": "Routed through CDN Router (:9000) to Edge, but cache is bypassed. Forces Origin roundtrip on every request.",
+      "url": "http://localhost:9000/cdn/content/sample.txt?nocache=true",
+      "type": "ROUTED_NO_CACHE",
+      "actualMeasurement": true,
+      "simulatedLatencyMs": 35,
+      "averageLatencyMs": 82.7,
+      "p50LatencyMs": 79,
+      "p95LatencyMs": 124,
+      "p99LatencyMs": 148,
+      "requestsPerSecond": 119.8,
+      "totalRequests": 359,
+      "totalBytes": 143241,
+      "totalBytesFormatted": "139.88 KB",
+      "throughputBytesPerSec": 47747,
+      "cacheStatus": "BYPASS",
+      "originContacted": true
+    },
+    {
+      "id": "cdn-cache-enabled",
+      "name": "CDN Request (Cache Enabled)",
+      "description": "Routed through CDN Router (:9000) to Mumbai Edge (:8001). Served directly from in-memory LRU cache.",
+      "url": "http://localhost:9000/cdn/content/sample.txt",
+      "type": "OPTIMAL_CDN",
+      "actualMeasurement": true,
+      "simulatedLatencyMs": 35,
+      "averageLatencyMs": 9.4,
+      "p50LatencyMs": 8,
+      "p95LatencyMs": 16.5,
+      "p99LatencyMs": 24,
+      "requestsPerSecond": 1042.6,
+      "totalRequests": 3128,
+      "totalBytes": 1248072,
+      "totalBytesFormatted": "1.19 MB",
+      "throughputBytesPerSec": 416024,
+      "cacheStatus": "HIT",
+      "originContacted": false
+    }
+  ],
+  "comparison": {
+    "speedupVsOrigin": "4.91x faster",
+    "speedupVsUncached": "8.8x faster",
+    "throughputMultiplier": "4.84x throughput",
+    "latencySavedPercent": "79.7%"
+  },
+  "measurementNotes": {
+    "actualMeasurement": "Raw Node.js TCP/HTTP roundtrip latency and throughput measured by Autocannon socket telemetry",
+    "simulatedComponent": "Configured geographic delay (Mumbai 35ms, Frankfurt 150ms) injected at edge hops"
+  }
+}

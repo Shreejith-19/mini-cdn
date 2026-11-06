@@ -19,7 +19,8 @@
     "test:edge": "node edge/edge.test.js",
     "test:router": "node router/router.test.js",
     "test:metrics": "node metrics/metrics.test.js",
-    "test:simulator": "node test-simulator.js"
+    "test:simulator": "node test-simulator.js",
+    "test:final": "node test-final-verification.js"
   },
   "dependencies": {
     "autocannon": "^9.0.0",

@@ -152,13 +152,30 @@ Once running:
 
 ---
 
-### Option B: Docker Compose
+### Option B: Docker Compose (All 7 Microservices)
+
+The project includes dedicated Dockerfiles for each architectural tier:
+- **Origin Server**: [`backend/origin/Dockerfile`](file:///backend/origin/Dockerfile)
+- **Edge Server**: [`backend/edge/Dockerfile`](file:///backend/edge/Dockerfile)
+- **CDN Router**: [`backend/router/Dockerfile`](file:///backend/router/Dockerfile)
+- **React Frontend**: [`frontend/Dockerfile`](file:///frontend/Dockerfile)
+
+All services communicate using Docker internal service names (`origin`, `edge-mumbai`, `edge-singapore`, `edge-frankfurt`, `edge-newyork`, `router`, `frontend`) across an isolated bridge network (`cdn-network`).
 
 Spin up all 7 independent microservices in parallel with a single command:
 
 ```bash
 docker compose up --build
 ```
+
+Container mapping:
+- `origin` (`:8000`)
+- `edge-mumbai` (`:8001`)
+- `edge-singapore` (`:8002`)
+- `edge-frankfurt` (`:8003`)
+- `edge-newyork` (`:8004`)
+- `router` (`:9000`)
+- `frontend` (`:5173`)
 
 To stop and remove containers:
 ```bash
@@ -169,9 +186,12 @@ docker compose down
 
 ## Testing & Benchmarks
 
-The project includes unit, integration, and performance benchmarking suites:
+The project includes unit, integration, end-to-end, and performance benchmarking suites:
 
 ```bash
+# Run Comprehensive Final Verification Suite (11/11 criteria)
+npm run test:final
+
 # Run Metrics Collection unit tests (10/10 tests)
 npm run test:metrics
 

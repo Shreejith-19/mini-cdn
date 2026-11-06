@@ -75,6 +75,7 @@ export function createEdgeApp(customConfig = {}) {
     const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
     res.status(200).json({
       status: 'healthy',
+      edgeId: config.id,
       edgeName: config.name,
       uptime: uptimeSeconds,
       location: config.location,

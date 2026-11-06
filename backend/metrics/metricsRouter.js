@@ -69,13 +69,23 @@ export function createMetricsRouter(collector = defaultCollector) {
   // GET /api/metrics/benchmarks
   router.get('/benchmarks', async (req, res) => {
     try {
-      const benchmarkPath = path.resolve(__dirname, '../../benchmarks/benchmark-scenarios.json');
+      let benchmarkPath = path.resolve(__dirname, '../../benchmarks/benchmark-scenarios.json');
+      if (!fs.existsSync(benchmarkPath)) {
+        benchmarkPath = path.resolve(__dirname, '../benchmarks/benchmark-scenarios.json');
+      }
       if (fs.existsSync(benchmarkPath)) {
         const raw = fs.readFileSync(benchmarkPath, 'utf8');
         return res.status(200).json(JSON.parse(raw));
       }
-      const { runScenarioBenchmarks } = await import('../../benchmarks/loadTest.js');
-      const data = await runScenarioBenchmarks();
+      let runFn;
+      try {
+        const mod = await import('../../benchmarks/loadTest.js');
+        runFn = mod.runScenarioBenchmarks;
+      } catch {
+        const mod = await import('../benchmarks/loadTest.js');
+        runFn = mod.runScenarioBenchmarks;
+      }
+      const data = await runFn();
       return res.status(200).json(data);
     } catch (err) {
       res.status(500).json({ error: 'Failed to read benchmark scenarios', details: err.message });
@@ -85,8 +95,15 @@ export function createMetricsRouter(collector = defaultCollector) {
   // POST /api/metrics/benchmarks/run
   router.post('/benchmarks/run', async (req, res) => {
     try {
-      const { runScenarioBenchmarks } = await import('../../benchmarks/loadTest.js');
-      const data = await runScenarioBenchmarks(req.body || {});
+      let runFn;
+      try {
+        const mod = await import('../../benchmarks/loadTest.js');
+        runFn = mod.runScenarioBenchmarks;
+      } catch {
+        const mod = await import('../benchmarks/loadTest.js');
+        runFn = mod.runScenarioBenchmarks;
+      }
+      const data = await runFn(req.body || {});
       res.status(200).json(data);
     } catch (err) {
       res.status(500).json({ error: 'Failed to execute Autocannon benchmark', details: err.message });

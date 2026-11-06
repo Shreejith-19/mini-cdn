@@ -22,6 +22,7 @@
     "test:router": "npm --prefix backend run test:router",
     "test:metrics": "npm --prefix backend run test:metrics",
     "test:simulator": "npm --prefix backend run test:simulator",
+    "test:final": "npm --prefix backend run test:final",
     "test:load": "node benchmarks/loadTest.js",
     "install:all": "npm --prefix backend install && npm --prefix frontend install"
   },

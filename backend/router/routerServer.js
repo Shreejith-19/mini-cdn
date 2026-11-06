@@ -239,10 +239,10 @@ export function createRouterApp(customConfig = {}) {
   });
 
   /**
-   * PUT /cdn/config
+   * PUT / POST /cdn/config
    * Change the routing strategy (ROUND_ROBIN or LOWEST_LATENCY)
    */
-  app.put('/cdn/config', (req, res) => {
+  const handleConfigUpdate = (req, res) => {
     const { strategy } = req.body || {};
     if (!strategy) {
       return res.status(400).json({
@@ -262,7 +262,10 @@ export function createRouterApp(customConfig = {}) {
     return res.status(400).json({
       error: `Invalid strategy: "${strategy}". Acceptable values: ROUND_ROBIN, LOWEST_LATENCY`
     });
-  });
+  };
+
+  app.put('/cdn/config', handleConfigUpdate);
+  app.post('/cdn/config', handleConfigUpdate);
 
   /**
    * GET /cdn/edges and GET /admin/edges
@@ -314,12 +317,13 @@ export function createRouterApp(customConfig = {}) {
 
     res.status(200).json({
       message: `Edge "${edge.name}" marked offline for failure testing`,
+      status: 'OFFLINE',
       edge: {
         id: edge.id,
         name: edge.name,
         location: edge.location,
         disabled: edge.disabled,
-        status: 'UNHEALTHY (SIMULATED FAILURE)'
+        status: 'OFFLINE'
       }
     });
   };
@@ -351,6 +355,7 @@ export function createRouterApp(customConfig = {}) {
 
     res.status(200).json({
       message: `Edge "${edge.name}" restored online and available for routing`,
+      status: 'HEALTHY',
       edge: {
         id: edge.id,
         name: edge.name,

@@ -44,10 +44,13 @@ app.get('/', (req, res) => {
 });
 
 // Start listening if run directly
-const server = app.listen(PORT, () => {
-  console.log(`[Mini CDN Origin] Server running on http://localhost:${PORT}`);
-  console.log(`[Mini CDN Origin] Diagnostics: http://localhost:${PORT}/origin`);
-  console.log(`[Mini CDN Origin] Health: http://localhost:${PORT}/health`);
-});
+let server = null;
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  server = app.listen(PORT, () => {
+    console.log(`[Mini CDN Origin] Server running on http://localhost:${PORT}`);
+    console.log(`[Mini CDN Origin] Diagnostics: http://localhost:${PORT}/origin`);
+    console.log(`[Mini CDN Origin] Health: http://localhost:${PORT}/health`);
+  });
+}
 
 export { app, server };
