@@ -20,7 +20,7 @@
 
   <rect width="800" height="400" fill="url(#bg)" rx="16" />
 
-  <!-- Grid pattern -->
+  <!-- Network Grid Lines -->
   <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
     <line x1="100" y1="0" x2="100" y2="400" />
     <line x1="200" y1="0" x2="200" y2="400" />
@@ -34,7 +34,7 @@
     <line x1="0" y1="300" x2="800" y2="300" />
   </g>
 
-  <!-- Network lines -->
+  <!-- Topology Connection lines -->
   <g stroke="url(#accent)" stroke-width="2.5" stroke-dasharray="4,4" opacity="0.7">
     <line x1="400" y1="140" x2="220" y2="260" />
     <line x1="400" y1="140" x2="340" y2="280" />
@@ -75,4 +75,3 @@
     High Performance Edge Caching &amp; Intelligent Routing Architecture
   </text>
 </svg>
-

@@ -1,13 +1,24 @@
 {
   "name": "mini-cdn",
   "version": "1.0.0",
-  "description": "Mini CDN Simulator - Demonstrating Edge Caching, Intelligent Routing and Performance Monitoring",
-  "type": "module",
+  "description": "Mini CDN (Content Delivery Network) Simulator",
+  "private": true,
   "scripts": {
-    "start:origin": "node origin-server/src/server.js",
-    "test:origin": "node origin-server/tests/origin.test.js"
+    "start:backend": "npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "install:all": "npm --prefix backend install && npm --prefix frontend install"
   },
-  "keywords": ["cdn", "edge-computing", "caching", "intelligent-routing", "simulator"],
+  "keywords": [
+    "cdn",
+    "edge-caching",
+    "routing",
+    "simulator",
+    "express",
+    "react",
+    "recharts"
+  ],
+  "author": "",
   "license": "MIT"
 }
-

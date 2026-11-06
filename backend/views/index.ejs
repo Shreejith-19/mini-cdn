@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    h1 { color: #38bdf8; margin-top: 0; font-size: 1.5rem; }
+    .badge {
+      display: inline-block;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    p { color: #94a3b8; line-height: 1.6; }
+    code { background: #0f172a; padding: 0.2rem 0.4rem; border-radius: 4px; color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">● EJS View Engine Active</div>
+    <h1><%= title %></h1>
+    <p><%= message %></p>
+    <p>Health endpoint: <a href="/health" style="color: #38bdf8;">/health</a></p>
+    <p>Server Port: <code><%= port %></code></p>
+  </div>
+</body>
+</html>
+
