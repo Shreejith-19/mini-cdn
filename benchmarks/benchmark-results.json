@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-11-06T17:37:18.186Z",
+  "benchmarks": [
+    {
+      "name": "Origin vs Edge Latency",
+      "originMs": 185,
+      "edgeMs": 14,
+      "accelerationRatio": 13.21
+    },
+    {
+      "name": "Cache Hit vs Miss Acceleration",
+      "coldMissMs": 82,
+      "warmHitMs": 11,
+      "speedupRatio": 7.45
+    },
+    {
+      "name": "Geographic Latency Map",
+      "nodes": [
+        {
+          "city": "Mumbai",
+          "port": 8001,
+          "simulated": 35,
+          "region": "Asia-South"
+        },
+        {
+          "city": "Singapore",
+          "port": 8002,
+          "simulated": 80,
+          "region": "Asia-Southeast"
+        },
+        {
+          "city": "Frankfurt",
+          "port": 8003,
+          "simulated": 150,
+          "region": "Europe-Central"
+        },
+        {
+          "city": "New York",
+          "port": 8004,
+          "simulated": 180,
+          "region": "US-East"
+        }
+      ]
+    }
+  ]
+}

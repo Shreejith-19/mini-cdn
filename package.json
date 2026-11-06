@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Mini CDN (Content Delivery Network) Simulator",
   "private": true,
+  "type": "module",
   "scripts": {
     "start:backend": "npm --prefix backend start",
     "start:origin": "npm --prefix backend start",
@@ -12,12 +13,14 @@
     "start:newyork": "npm --prefix backend run start:newyork",
     "start:edges": "npm --prefix backend run start:edges",
     "start:router": "npm --prefix backend run start:router",
+    "benchmark": "node benchmarks/benchmark.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",
     "test:origin": "npm --prefix backend run test:origin",
     "test:edge": "npm --prefix backend run test:edge",
     "test:router": "npm --prefix backend run test:router",
+    "test:metrics": "npm --prefix backend run test:metrics",
     "install:all": "npm --prefix backend install && npm --prefix frontend install"
   },
   "keywords": [
