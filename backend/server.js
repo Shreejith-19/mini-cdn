@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
 import originRouter from './origin/originRouter.js';
+import metricsRouter from './metrics/metricsRouter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount Origin server router at /origin
 app.use('/origin', originRouter);
+app.use('/api/metrics', metricsRouter);
 
 // Global Health check endpoint
 app.get(['/health', '/api/health'], (req, res) => {

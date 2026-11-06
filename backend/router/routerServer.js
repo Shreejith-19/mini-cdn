@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { metricsCollector as globalMetricsCollector } from '../metrics/metricsCollector.js';
+import { createMetricsRouter } from '../metrics/metricsRouter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +11,7 @@ const __dirname = path.dirname(__filename);
 export function createRouterApp(customConfig = {}) {
   const app = express();
   const PORT = parseInt(process.env.ROUTER_PORT || process.env.PORT || customConfig.port || '9000', 10);
+  const collector = customConfig.metricsCollector || globalMetricsCollector;
 
   // Supported routing strategies
   const STRATEGIES = {
@@ -97,6 +100,9 @@ export function createRouterApp(customConfig = {}) {
   app.set('view engine', 'ejs');
   app.set('views', path.resolve(__dirname, '../views'));
 
+  // Mount Metrics Collection API
+  app.use('/api/metrics', createMetricsRouter(collector));
+
   function recordDecision(decision) {
     routingDecisions.unshift({
       id: `route-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -162,6 +168,10 @@ export function createRouterApp(customConfig = {}) {
       }
     } finally {
       edge.lastChecked = new Date().toISOString();
+      collector.updateEdgeHealth(edge.id, {
+        healthStatus: edge.disabled ? 'UNHEALTHY' : edge.status,
+        disabled: edge.disabled
+      });
     }
   }
 
@@ -281,6 +291,10 @@ export function createRouterApp(customConfig = {}) {
 
     // Set administrative disabled flag separately from actual probe result
     edge.disabled = true;
+    collector.updateEdgeHealth(edge.id, {
+      healthStatus: 'UNHEALTHY',
+      disabled: true
+    });
 
     res.status(200).json({
       message: `Edge "${edge.name}" marked offline for failure testing`,
@@ -314,6 +328,10 @@ export function createRouterApp(customConfig = {}) {
     edge.disabled = false;
     edge.status = 'HEALTHY';
     edge.consecutiveFailures = 0;
+    collector.updateEdgeHealth(edge.id, {
+      healthStatus: 'HEALTHY',
+      disabled: false
+    });
 
     res.status(200).json({
       message: `Edge "${edge.name}" restored online and available for routing`,
@@ -343,15 +361,26 @@ export function createRouterApp(customConfig = {}) {
 
     // Meaningful error if all edges are unavailable
     if (!selectedEdge) {
+      const actualDurationMs = Date.now() - requestStart;
       recordDecision({
         file: safeFilename,
         strategy: currentStrategy,
         selectedEdge: 'NONE',
         edgePort: null,
         simulatedLatencyMs: 0,
-        actualDurationMs: Date.now() - requestStart,
+        actualDurationMs,
         status: 503,
         error: 'All edge servers are currently unavailable'
+      });
+
+      collector.recordRequest({
+        filename: safeFilename,
+        edgeId: null,
+        edgeName: 'None',
+        cacheStatus: 'ERROR',
+        latencyMs: actualDurationMs,
+        statusCode: 503,
+        bytes: 0
       });
 
       return res.status(503).json({
@@ -396,6 +425,16 @@ export function createRouterApp(customConfig = {}) {
 
       // Pass-through conditional 304 Not Modified
       if (edgeRes.status === 304) {
+        collector.recordRequest({
+          filename: safeFilename,
+          edgeId: selectedEdge.id,
+          edgeName: selectedEdge.name,
+          cacheStatus: 'HIT',
+          latencyMs: actualDurationMs,
+          statusCode: 304,
+          bytes: 0
+        });
+
         res.setHeader('X-Selected-Edge', selectedEdge.name);
         res.setHeader('X-Edge-Simulated-Latency', `${selectedEdge.simulatedLatencyMs}ms`);
         res.setHeader('X-Actual-Request-Duration', `${actualDurationMs}ms`);
@@ -406,6 +445,18 @@ export function createRouterApp(customConfig = {}) {
       // Check if edge returned 404 or other non-OK status
       if (!edgeRes.ok) {
         const errorText = await edgeRes.text();
+        const errBytes = Buffer.byteLength(errorText || '');
+
+        collector.recordRequest({
+          filename: safeFilename,
+          edgeId: selectedEdge.id,
+          edgeName: selectedEdge.name,
+          cacheStatus: cacheStatus !== 'UNKNOWN' ? cacheStatus : 'ERROR',
+          latencyMs: actualDurationMs,
+          statusCode: edgeRes.status,
+          bytes: errBytes
+        });
+
         res.setHeader('X-Selected-Edge', selectedEdge.name);
         res.setHeader('X-Edge-Simulated-Latency', `${selectedEdge.simulatedLatencyMs}ms`);
         res.setHeader('X-Actual-Request-Duration', `${actualDurationMs}ms`);
@@ -415,6 +466,16 @@ export function createRouterApp(customConfig = {}) {
 
       const arrayBuffer = await edgeRes.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+
+      collector.recordRequest({
+        filename: safeFilename,
+        edgeId: selectedEdge.id,
+        edgeName: selectedEdge.name,
+        cacheStatus,
+        latencyMs: actualDurationMs,
+        statusCode: 200,
+        bytes: buffer.length
+      });
 
       // Metadata headers clearly distinguishing simulated routing latency from actual duration
       res.setHeader('X-Selected-Edge', selectedEdge.name);
@@ -449,6 +510,16 @@ export function createRouterApp(customConfig = {}) {
         actualDurationMs,
         status: 504,
         error: err.message
+      });
+
+      collector.recordRequest({
+        filename: safeFilename,
+        edgeId: selectedEdge.id,
+        edgeName: selectedEdge.name,
+        cacheStatus: 'ERROR',
+        latencyMs: actualDurationMs,
+        statusCode: 504,
+        bytes: 0
       });
 
       return res.status(504).json({
@@ -508,7 +579,7 @@ export function createRouterApp(customConfig = {}) {
     clearInterval(probeTimer);
   };
 
-  return { app, edges, selectEdge, close, PORT, checkAllEdges, probeEdge };
+  return { app, edges, selectEdge, close, PORT, checkAllEdges, probeEdge, metricsCollector: collector };
 }
 
 // Standalone start

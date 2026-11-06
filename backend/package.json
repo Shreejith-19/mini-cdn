@@ -17,7 +17,8 @@
     "test": "node verify.js",
     "test:origin": "node origin/origin.test.js",
     "test:edge": "node edge/edge.test.js",
-    "test:router": "node router/router.test.js"
+    "test:router": "node router/router.test.js",
+    "test:metrics": "node metrics/metrics.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
