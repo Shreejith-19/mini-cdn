@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Database,
   Zap,
@@ -9,7 +10,8 @@ import {
   AlertTriangle,
   ArrowUpRight,
   TrendingUp,
-  FileCode
+  FileCode,
+  Trash2
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -24,12 +26,13 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { clearAllEdgeCaches } from '../services/api';
 
-const cachePerformanceByEdge = [
-  { edge: 'Mumbai', hits: 381000, misses: 31400, hitRatio: 92.4 },
-  { edge: 'Singapore', hits: 343200, misses: 42000, hitRatio: 89.1 },
-  { edge: 'Frankfurt', hits: 278400, misses: 42400, hitRatio: 86.8 },
-  { edge: 'New York', hits: 264600, misses: 45950, hitRatio: 85.2 },
+const defaultEdgeCache = [
+  { edge: 'Mumbai', hits: 0, misses: 0, hitRatio: 0 },
+  { edge: 'Singapore', hits: 0, misses: 0, hitRatio: 0 },
+  { edge: 'Frankfurt', hits: 0, misses: 0, hitRatio: 0 },
+  { edge: 'New York', hits: 0, misses: 0, hitRatio: 0 },
 ];
 
 const contentDistribution = [
@@ -39,15 +42,50 @@ const contentDistribution = [
   { name: 'HTML & Text Documents', value: 10, color: '#94a3b8' },
 ];
 
-const cachedHotObjects = [
-  { key: '/origin/content/styles.css', type: 'text/css', size: '501 B', hits: 48200, ttl: '42s remaining', etag: '"3a1b4c9f"' },
-  { key: '/origin/content/banner.svg', type: 'image/svg+xml', size: '3.6 KB', hits: 39100, ttl: '28s remaining', etag: '"7e2d9a11"' },
-  { key: '/origin/content/data.json', type: 'application/json', size: '191 B', hits: 34500, ttl: '51s remaining', etag: '"f4c08e1a"' },
-  { key: '/origin/content/script.js', type: 'application/javascript', size: '233 B', hits: 29800, ttl: '35s remaining', etag: '"9b2a7e43"' },
-  { key: '/origin/content/large-payload.json', type: 'application/json', size: '2.1 KB', hits: 21400, ttl: '19s remaining', etag: '"18ef55ac"' },
-];
-
 export default function CacheAnalyticsPage() {
+  const context = useOutletContext() || {};
+  const { data, refresh } = context;
+
+  const [purging, setPurging] = useState(false);
+
+  const overview = data?.metrics?.overview;
+  const cacheMetrics = data?.metrics?.cache;
+  const bandwidth = data?.metrics?.bandwidth;
+  const metricsEdges = data?.metrics?.edges || [];
+  const originFiles = data?.origin?.files || [];
+
+  const overallHitRatio = overview?.cacheHitRatio !== undefined ? `${Number(overview.cacheHitRatio).toFixed(1)}%` : '0.0%';
+  const totalHits = overview?.totalCacheHits ?? 0;
+  const totalMisses = overview?.totalCacheMisses ?? 0;
+  const bandwidthSaved = bandwidth?.bandwidthSavedFormatted || '0 B';
+
+  // Live bar chart data
+  const edgeChartData = defaultEdgeCache.map(def => {
+    const found = metricsEdges.find(e => e.id?.toLowerCase().includes(def.edge.toLowerCase()) || e.name?.toLowerCase().includes(def.edge.toLowerCase()));
+    if (found) {
+      return {
+        edge: def.edge,
+        hits: found.cacheHits || 0,
+        misses: found.cacheMisses || 0,
+        hitRatio: found.cacheHitRatio || 0
+      };
+    }
+    return def;
+  });
+
+  async function handlePurgeAll() {
+    if (!confirm('Flush all in-memory LRU caches across all 4 Edge Servers (Mumbai, Singapore, Frankfurt, New York)?')) return;
+    setPurging(true);
+    try {
+      await clearAllEdgeCaches();
+      if (refresh) await refresh();
+    } catch (err) {
+      alert(`Purge failed: ${err.message}`);
+    } finally {
+      setPurging(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -61,10 +99,12 @@ export default function CacheAnalyticsPage() {
 
         <button
           type="button"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 transition"
+          disabled={purging}
+          onClick={handlePurgeAll}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 text-xs font-semibold text-slate-700 shadow-sm transition"
         >
-          <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-          <span>Purge All Edge Caches</span>
+          <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${purging ? 'animate-spin' : ''}`} />
+          <span>{purging ? 'Purging Caches...' : 'Purge All Edge Caches'}</span>
         </button>
       </div>
 
@@ -78,8 +118,8 @@ export default function CacheAnalyticsPage() {
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-slate-900">88.4%</div>
-            <span className="text-xs text-emerald-600 font-medium">+2.1% origin offload rate</span>
+            <div className="text-2xl font-bold text-slate-900">{overallHitRatio}</div>
+            <span className="text-xs text-emerald-600 font-medium">Real-time origin offload rate</span>
           </div>
         </div>
 
@@ -91,7 +131,7 @@ export default function CacheAnalyticsPage() {
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-slate-900">1,267,200</div>
+            <div className="text-2xl font-bold text-slate-900">{totalHits.toLocaleString()}</div>
             <span className="text-xs text-slate-400">Zero origin latency impact</span>
           </div>
         </div>
@@ -104,7 +144,7 @@ export default function CacheAnalyticsPage() {
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-slate-900">161,750</div>
+            <div className="text-2xl font-bold text-slate-900">{totalMisses.toLocaleString()}</div>
             <span className="text-xs text-slate-400">Fetched from Origin (:8000)</span>
           </div>
         </div>
@@ -117,8 +157,8 @@ export default function CacheAnalyticsPage() {
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-slate-900">4.82 TB</div>
-            <span className="text-xs text-purple-600 font-medium">78% saved from origin server</span>
+            <div className="text-2xl font-bold text-slate-900">{bandwidthSaved}</div>
+            <span className="text-xs text-purple-600 font-medium">Saved from origin server</span>
           </div>
         </div>
       </div>
@@ -136,7 +176,7 @@ export default function CacheAnalyticsPage() {
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cachePerformanceByEdge} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+              <BarChart data={edgeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="edge" stroke="#94a3b8" fontSize={11} />
                 <YAxis stroke="#94a3b8" fontSize={11} />
@@ -156,7 +196,7 @@ export default function CacheAnalyticsPage() {
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Cached Asset Types</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Breakdown of objects stored in edge in-memory caches</p>
+              <p className="text-xs text-slate-500 mt-0.5">Distribution of supported static content formats</p>
             </div>
           </div>
 
@@ -199,54 +239,58 @@ export default function CacheAnalyticsPage() {
         </div>
       </div>
 
-      {/* Hot Cached Objects Table */}
+      {/* Authoritative Origin Files Table */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Hot Cached Assets</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Frequently requested files currently held in edge RAM</p>
+            <h3 className="text-sm font-bold text-slate-900">Authoritative Origin Content Catalog</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Storage assets stored on Origin Server (:8000) eligible for edge caching</p>
           </div>
-          <span className="text-xs text-slate-400">Default TTL: 60s &bull; Max: 100 objects</span>
+          <span className="text-xs text-slate-400">Capacity: 100 per node &bull; TTL: 60s</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                <th className="py-2.5 px-4">Cache Key / URI</th>
+                <th className="py-2.5 px-4">Filename</th>
                 <th className="py-2.5 px-4">Content-Type</th>
                 <th className="py-2.5 px-4">Size</th>
-                <th className="py-2.5 px-4">Hit Count</th>
-                <th className="py-2.5 px-4">TTL Status</th>
-                <th className="py-2.5 px-4">ETag</th>
+                <th className="py-2.5 px-4">Origin URI</th>
+                <th className="py-2.5 px-4">Caching Policy</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono">
-              {cachedHotObjects.map(obj => (
-                <tr key={obj.key} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-semibold text-blue-600">
-                    {obj.key}
-                  </td>
-                  <td className="py-3 px-4 text-slate-600 font-sans">
-                    {obj.type}
-                  </td>
-                  <td className="py-3 px-4 text-slate-700">
-                    {obj.size}
-                  </td>
-                  <td className="py-3 px-4 text-slate-900 font-semibold font-sans">
-                    {obj.hits.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4 font-sans">
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-medium border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      {obj.ttl}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-slate-400 text-[11px]">
-                    {obj.etag}
+              {originFiles.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-6 text-slate-400 text-xs font-sans">
+                    Connecting to Origin Storage (:8000)...
                   </td>
                 </tr>
-              ))}
+              ) : (
+                originFiles.map(file => (
+                  <tr key={file.filename} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4 font-semibold text-blue-600">
+                      {file.filename}
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 font-sans">
+                      {file.mimeType}
+                    </td>
+                    <td className="py-3 px-4 text-slate-700 font-sans">
+                      {file.sizeFormatted || `${file.size} B`}
+                    </td>
+                    <td className="py-3 px-4 text-slate-400 text-[11px]">
+                      {file.url}
+                    </td>
+                    <td className="py-3 px-4 font-sans">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-medium border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        LRU Eligible (60s)
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -254,4 +298,3 @@ export default function CacheAnalyticsPage() {
     </div>
   );
 }
-

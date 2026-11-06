@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Settings,
   Compass,
@@ -10,20 +11,43 @@ import {
   Save,
   CheckCircle2,
   AlertTriangle,
-  Globe
+  Globe,
+  RefreshCw
 } from 'lucide-react';
+import { updateRouterStrategy, clearAllEdgeCaches } from '../services/api';
 
 export default function SettingsPage() {
-  const [strategy, setStrategy] = useState('ROUND_ROBIN');
+  const context = useOutletContext() || {};
+  const { data, refresh } = context;
+
+  const currentStrategy = data?.router?.strategy || 'ROUND_ROBIN';
+  const [strategy, setStrategy] = useState(currentStrategy);
   const [cacheTtl, setCacheTtl] = useState(60);
   const [cacheCapacity, setCacheCapacity] = useState(100);
-  const [healthInterval, setHealthInterval] = useState(5);
+  const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
-  function handleSave(e) {
+  useEffect(() => {
+    if (data?.router?.strategy) {
+      setStrategy(data.router.strategy);
+    }
+  }, [data?.router?.strategy]);
+
+  async function handleSave(e) {
     e.preventDefault();
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 3000);
+    setSaving(true);
+    setErrorMessage(null);
+    try {
+      await updateRouterStrategy(strategy);
+      if (refresh) await refresh();
+      setSavedNotice(true);
+      setTimeout(() => setSavedNotice(false), 3000);
+    } catch (err) {
+      setErrorMessage(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -39,7 +63,14 @@ export default function SettingsPage() {
       {savedNotice && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs flex items-center gap-2 font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Configuration saved successfully. Active routing rules have been applied.</span>
+          <span>Routing strategy updated successfully in CDN Router (:9000).</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2 font-medium">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>Update error: {errorMessage}</span>
         </div>
       )}
 
@@ -177,14 +208,14 @@ export default function SettingsPage() {
         <div className="flex justify-end">
           <button
             type="submit"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition"
           >
-            <Save className="w-3.5 h-3.5" />
-            <span>Save Configuration</span>
+            {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            <span>{saving ? 'Updating...' : 'Save Configuration'}</span>
           </button>
         </div>
       </form>
     </div>
   );
 }
-

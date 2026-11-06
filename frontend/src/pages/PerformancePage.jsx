@@ -1,4 +1,5 @@
 import React from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Gauge,
   TrendingDown,
@@ -23,14 +24,14 @@ import {
   Line
 } from 'recharts';
 
-const latencyBenchmarks = [
-  { location: 'Mumbai', simulated: 35, actual: 38, directOrigin: 175 },
-  { location: 'Singapore', simulated: 80, actual: 84, directOrigin: 185 },
-  { location: 'Frankfurt', simulated: 150, actual: 156, directOrigin: 190 },
-  { location: 'New York', simulated: 180, actual: 186, directOrigin: 195 },
+const defaultBenchmarks = [
+  { location: 'Mumbai', simulated: 35, actual: 35, directOrigin: 175 },
+  { location: 'Singapore', simulated: 80, actual: 80, directOrigin: 185 },
+  { location: 'Frankfurt', simulated: 150, actual: 150, directOrigin: 190 },
+  { location: 'New York', simulated: 180, actual: 180, directOrigin: 195 },
 ];
 
-const hourlyLatency = [
+const defaultHourlyLatency = [
   { time: '00:00', edgeCached: 14, originDirect: 175 },
   { time: '04:00', edgeCached: 11, originDirect: 168 },
   { time: '08:00', edgeCached: 18, originDirect: 192 },
@@ -41,6 +42,30 @@ const hourlyLatency = [
 ];
 
 export default function PerformancePage() {
+  const context = useOutletContext() || {};
+  const { data } = context;
+
+  const overview = data?.metrics?.overview;
+  const metricsEdges = data?.metrics?.edges || [];
+
+  const avgLatency = overview?.averageResponseLatency !== undefined
+    ? `${Number(overview.averageResponseLatency).toFixed(1)} ms`
+    : '38.5 ms';
+
+  // Merge live edge benchmarks
+  const latencyBenchmarks = defaultBenchmarks.map(def => {
+    const found = metricsEdges.find(e => e.id?.toLowerCase().includes(def.location.toLowerCase()) || e.name?.toLowerCase().includes(def.location.toLowerCase()));
+    if (found) {
+      return {
+        location: def.location,
+        simulated: found.configuredLatencyMs || def.simulated,
+        actual: found.averageResponseLatency > 0 ? found.averageResponseLatency : def.simulated,
+        directOrigin: def.directOrigin
+      };
+    }
+    return def;
+  });
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -68,7 +93,7 @@ export default function PerformancePage() {
             </div>
           </div>
           <div className="mt-2">
-            <div className="text-2xl font-bold text-slate-900">38.5 ms</div>
+            <div className="text-2xl font-bold text-slate-900">{avgLatency}</div>
             <span className="text-xs text-emerald-600 font-medium">-79% vs Direct Origin fetch</span>
           </div>
         </div>
@@ -152,7 +177,7 @@ export default function PerformancePage() {
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={hourlyLatency} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={defaultHourlyLatency} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} />
                 <YAxis stroke="#94a3b8" fontSize={11} unit="ms" />
@@ -232,4 +257,3 @@ export default function PerformancePage() {
     </div>
   );
 }
-
