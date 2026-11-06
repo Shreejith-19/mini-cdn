@@ -12,10 +12,12 @@
     "start:frankfurt": "node edge/edgeServer.js --edge=frankfurt",
     "start:newyork": "node edge/edgeServer.js --edge=newyork",
     "start:edges": "node edge/startEdges.js",
+    "start:router": "node router/routerServer.js",
     "dev": "node --watch server.js",
     "test": "node verify.js",
     "test:origin": "node origin/origin.test.js",
-    "test:edge": "node edge/edge.test.js"
+    "test:edge": "node edge/edge.test.js",
+    "test:router": "node router/router.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

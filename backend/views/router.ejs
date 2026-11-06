@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CDN Intelligent Router (:9000)</title>
+  <title>CDN Central Router Diagnostics (:9000)</title>
   <style>
     :root {
       --bg: #090d16;
@@ -25,11 +25,12 @@
     .badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; }
     .badge-green { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
     .badge-red { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
     .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px #34d399; }
     .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
     .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
-    .card-value { font-size: 2rem; font-weight: 700; color: var(--text-main); }
+    .card-value { font-size: 1.75rem; font-weight: 700; color: var(--text-main); }
     .card-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
     .section-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; color: #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
     table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -41,16 +42,11 @@
     .code { font-family: monospace; background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
     .btn { background: var(--accent); color: #0f172a; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; font-size: 0.85rem; }
     .btn:hover { opacity: 0.9; }
-    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.4rem 0.9rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer; }
-    .btn-danger:hover { background: #ef4444; color: #fff; }
     .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
     .btn-secondary:hover { color: var(--text-main); border-color: var(--text-muted); }
     .nav-links { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
-    .sim-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
-    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
-    label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
-    select, input[type=text] { background: #1e293b; border: 1px solid var(--border); color: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.9rem; }
-    .result-box { margin-top: 1.25rem; padding: 1rem; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 8px; display: none; }
+    .strategy-control { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+    select { background: #1e293b; border: 1px solid var(--border); color: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -58,17 +54,17 @@
     <header>
       <div>
         <h1 style="font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem;">
-          🧭 CDN Intelligent Router
+          🧭 Central CDN Router
           <span class="badge badge-green"><span class="pulse-dot"></span> Port <%= port %> ONLINE</span>
         </h1>
         <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem;">
-          Intelligent Geo-Proximity &bull; Latency-Based &bull; Round-Robin &bull; Failover Engine
+          Forwards client requests to Mumbai (:8001), Singapore (:8002), Frankfurt (:8003), New York (:8004)
         </p>
       </div>
       <div class="nav-links">
-        <a href="/api/router/stats" target="_blank" class="code">GET /api/router/stats</a>
-        <a href="/api/network/topology" target="_blank" class="code">GET /api/network/topology</a>
-        <button class="btn-danger" onclick="broadcastGlobalPurge()">Global Cache Purge</button>
+        <a href="/cdn/config" target="_blank" class="code">GET /cdn/config</a>
+        <a href="/cdn/edges" target="_blank" class="code">GET /cdn/edges</a>
+        <a href="/cdn/decisions" target="_blank" class="code">GET /cdn/decisions</a>
         <button class="btn-secondary" onclick="location.reload()">↻ Refresh</button>
       </div>
     </header>
@@ -76,66 +72,80 @@
     <!-- Key Metrics Grid -->
     <div class="grid-4">
       <div class="card">
-        <div class="card-title">Total Requests Routed</div>
-        <div class="card-value"><%= stats.totalRouted %></div>
-        <div class="card-sub">Proxy decisions executed</div>
-      </div>
-      <div class="card">
-        <div class="card-title">Active Routing Strategy</div>
-        <div class="card-value" style="color: #38bdf8; font-size: 1.5rem; text-transform: capitalize;">
-          <%= defaultStrategy %>
+        <div class="card-title">Routing Strategy</div>
+        <div class="card-value" style="color: #38bdf8; font-size: 1.4rem;">
+          <%= strategy %>
         </div>
-        <div class="card-sub">Geo-Proximity (Haversine Distance)</div>
+        <div class="card-sub">ROUND_ROBIN or LOWEST_LATENCY</div>
       </div>
+
       <div class="card">
-        <div class="card-title">Active Edge PoPs</div>
-        <div class="card-value" style="color: #34d399;"><%= healthyCount %> / <%= edges.length %></div>
-        <div class="card-sub">Healthy edge nodes online</div>
+        <div class="card-title">Configured Edges</div>
+        <div class="card-value"><%= edges.length %> PoPs</div>
+        <div class="card-sub"><%= edges.filter(e => e.status === 'HEALTHY').length %> healthy &bull; <%= edges.filter(e => e.status === 'UNHEALTHY').length %> down</div>
       </div>
+
+      <div class="card">
+        <div class="card-title">Total Decisions Recorded</div>
+        <div class="card-value"><%= decisions.length %></div>
+        <div class="card-sub">Live audit trail in memory</div>
+      </div>
+
       <div class="card">
         <div class="card-title">Router Uptime</div>
-        <div class="card-value"><%= uptimeFormatted %></div>
-        <div class="card-sub">Central load balancer active</div>
+        <div class="card-value"><%= uptimeSeconds %>s</div>
+        <div class="card-sub">Listening on port <%= port %></div>
       </div>
     </div>
 
-    <!-- Edge Nodes Health & Routing Table -->
+    <!-- Strategy Switching Control -->
     <div class="card" style="margin-bottom: 2rem;">
-      <div class="section-title">
-        <span>🌐 Edge Node Routing Table &amp; Live Health</span>
-        <button class="btn-secondary" onclick="triggerHealthCheck()">Run Health Probes</button>
+      <h2 class="section-title">⚙️ Change Active Routing Strategy</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted);">
+        Select routing algorithm applied to incoming <code>/cdn/content/:filename</code> requests:
+      </p>
+      <div class="strategy-control">
+        <select id="strategySelect">
+          <option value="ROUND_ROBIN" <%= strategy === 'ROUND_ROBIN' ? 'selected' : '' %>>1. Round Robin (Sequential distribution)</option>
+          <option value="LOWEST_LATENCY" <%= strategy === 'LOWEST_LATENCY' ? 'selected' : '' %>>2. Lowest Simulated Latency (Mumbai 35ms)</option>
+        </select>
+        <button class="btn" onclick="updateStrategy()">Update Strategy (PUT /cdn/config)</button>
+        <span id="strategyMsg" style="font-size: 0.85rem;"></span>
       </div>
+    </div>
+
+    <!-- Edge Servers Table with Configured Simulated Latencies -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 class="section-title">⚡ Configured Edge Servers (4 Nodes)</h2>
       <table>
         <thead>
           <tr>
-            <th>Edge Node</th>
-            <th>Region</th>
+            <th>Edge Name</th>
+            <th>Location</th>
             <th>Port</th>
-            <th>Health Status</th>
-            <th>Probe Latency</th>
+            <th>Configured Simulated Latency</th>
+            <th>Status</th>
             <th>Requests Routed</th>
-            <th>Diagnostic UI</th>
+            <th>Diagnostics Link</th>
           </tr>
         </thead>
         <tbody>
           <% edges.forEach(function(edge) { %>
             <tr>
               <td><strong><%= edge.name %></strong></td>
-              <td><%= edge.region %></td>
+              <td><%= edge.location %></td>
               <td><span class="code">:<%= edge.port %></span></td>
+              <td>
+                <strong style="color: #38bdf8;"><%= edge.simulatedLatencyMs %> ms</strong>
+              </td>
               <td>
                 <span class="badge <%= edge.status === 'HEALTHY' ? 'badge-green' : 'badge-red' %>">
                   <%= edge.status %>
                 </span>
               </td>
-              <td>
-                <strong style="color: <%= edge.lastPingMs ? '#34d399' : '#f87171' %>;">
-                  <%= edge.lastPingMs ? edge.lastPingMs + ' ms' : 'Offline' %>
-                </strong>
-              </td>
               <td><strong><%= edge.requestsRouted || 0 %></strong></td>
               <td>
-                <a href="<%= edge.url %>/edge" target="_blank">View Edge Diagnostics ↗</a>
+                <a href="<%= edge.url %>/" target="_blank">View Edge Diagnostics ↗</a>
               </td>
             </tr>
           <% }); %>
@@ -143,96 +153,36 @@
       </table>
     </div>
 
-    <!-- Interactive Client Request Simulator -->
-    <div class="card" style="margin-bottom: 2rem;">
-      <h2 class="section-title">🚀 Interactive Client Routing Simulator</h2>
-      <p style="font-size: 0.85rem; color: var(--text-muted);">
-        Test intelligent routing by simulating a client request from anywhere in the world.
-      </p>
-
-      <form id="simForm" onsubmit="executeSimulation(event)">
-        <div class="sim-form">
-          <div class="form-group">
-            <label>Client Location:</label>
-            <select id="simLocation">
-              <optgroup label="Asia">
-                <option value="mumbai" selected>Mumbai, India</option>
-                <option value="delhi">Delhi, India</option>
-                <option value="bangalore">Bangalore, India</option>
-                <option value="singapore">Singapore</option>
-                <option value="tokyo">Tokyo, Japan</option>
-                <option value="sydney">Sydney, Australia</option>
-                <option value="dubai">Dubai, UAE</option>
-              </optgroup>
-              <optgroup label="Europe">
-                <option value="frankfurt">Frankfurt, Germany</option>
-                <option value="london">London, UK</option>
-                <option value="paris">Paris, France</option>
-                <option value="amsterdam">Amsterdam, Netherlands</option>
-              </optgroup>
-              <optgroup label="Americas">
-                <option value="new york">New York, USA</option>
-                <option value="chicago">Chicago, USA</option>
-                <option value="los angeles">Los Angeles, USA</option>
-                <option value="san francisco">San Francisco, USA</option>
-                <option value="sao paulo">São Paulo, Brazil</option>
-              </optgroup>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Routing Strategy:</label>
-            <select id="simStrategy">
-              <option value="geo-proximity" selected>Geo-Proximity (Nearest Edge)</option>
-              <option value="latency-based">Latency-Based (Fastest Ping)</option>
-              <option value="round-robin">Round-Robin (Load Balanced)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Target Asset:</label>
-            <input type="text" id="simAsset" value="sample.txt">
-          </div>
-        </div>
-
-        <div style="margin-top: 1rem;">
-          <button type="submit" class="btn">Execute Routing Decision</button>
-        </div>
-      </form>
-
-      <div id="simResult" class="result-box"></div>
-    </div>
-
-    <!-- Recent Routed Requests -->
+    <!-- Recorded Routing Decisions Log -->
     <div class="card">
-      <h2 class="section-title">📜 Recent Routed CDN Requests (Last 15)</h2>
+      <h2 class="section-title">📜 Recent Routing Decisions</h2>
       <table>
         <thead>
           <tr>
             <th>Time</th>
-            <th>Path</th>
-            <th>Client Location</th>
+            <th>File</th>
+            <th>Strategy Used</th>
             <th>Selected Edge</th>
-            <th>Strategy</th>
-            <th>Total Latency</th>
+            <th>Simulated Latency</th>
+            <th>Actual HTTP Duration</th>
             <th>Cache Status</th>
           </tr>
         </thead>
         <tbody>
-          <% if (recentRequests.length === 0) { %>
-            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No requests routed yet. Use the simulator above or make a request to /cdn/:filename!</td></tr>
+          <% if (decisions.length === 0) { %>
+            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No requests routed yet. Try fetching <code>/cdn/content/sample.txt</code>!</td></tr>
           <% } else { %>
-            <% recentRequests.forEach(function(req) { %>
+            <% decisions.forEach(function(d) { %>
               <tr>
-                <td><%= new Date(req.timestamp).toLocaleTimeString() %></td>
-                <td><strong><%= req.path %></strong></td>
-                <td><span class="code"><%= req.clientLocation %></span></td>
-                <td><strong style="color: #38bdf8;"><%= req.edgeName %></strong></td>
-                <td><span class="code"><%= req.strategy %></span></td>
-                <td><%= req.latencyMs %> ms</td>
+                <td><%= new Date(d.timestamp).toLocaleTimeString() %></td>
+                <td><strong><%= d.file %></strong></td>
+                <td><span class="code"><%= d.strategy %></span></td>
+                <td><strong style="color: #38bdf8;"><%= d.selectedEdge %></strong></td>
+                <td style="color: #38bdf8;"><%= d.simulatedLatencyMs %> ms</td>
+                <td style="color: <%= d.actualDurationMs < 50 ? '#34d399' : '#f59e0b' %>;"><%= d.actualDurationMs %> ms</td>
                 <td>
-                  <span class="badge <%= req.cacheStatus === 'HIT' ? 'badge-green' : 'badge-red' %>">
-                    <%= req.cacheStatus %>
+                  <span class="badge <%= d.cacheStatus === 'HIT' ? 'badge-green' : 'badge-blue' %>">
+                    <%= d.cacheStatus %>
                   </span>
                 </td>
               </tr>
@@ -244,68 +194,33 @@
   </div>
 
   <script>
-    async function executeSimulation(e) {
-      e.preventDefault();
-      const loc = document.getElementById('simLocation').value;
-      const strategy = document.getElementById('simStrategy').value;
-      const asset = document.getElementById('simAsset').value.trim();
-      const resultDiv = document.getElementById('simResult');
+    async function updateStrategy() {
+      const select = document.getElementById('strategySelect');
+      const val = select.value;
+      const msg = document.getElementById('strategyMsg');
+      msg.innerText = 'Updating...';
+      msg.style.color = '#38bdf8';
 
-      resultDiv.style.display = 'block';
-      resultDiv.innerHTML = 'Routing request...';
-
-      const start = Date.now();
       try {
-        const url = '/cdn/' + encodeURIComponent(asset) + '?clientLocation=' + encodeURIComponent(loc) + '&strategy=' + encodeURIComponent(strategy);
-        const res = await fetch(url);
-        const duration = Date.now() - start;
-        const selectedEdge = res.headers.get('x-cdn-selected-edge') || 'Unknown';
-        const edgePort = res.headers.get('x-cdn-edge-port') || 'Unknown';
-        const usedStrategy = res.headers.get('x-cdn-routing-strategy') || strategy;
-        const cacheStatus = res.headers.get('x-cache') || 'UNKNOWN';
-
-        resultDiv.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <strong style="color: #38bdf8; font-size: 1.05rem;">✅ Routing Complete (${duration} ms total)</strong>
-            <span class="badge ${cacheStatus === 'HIT' ? 'badge-green' : 'badge-red'}">${cacheStatus}</span>
-          </div>
-          <p style="font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5rem;">
-            Routed client in <strong>${loc}</strong> via <strong>${usedStrategy}</strong> to <strong>${selectedEdge}</strong> (Port :${edgePort}).
-          </p>
-          <div style="font-size: 0.85rem; color: #94a3b8;">
-            Direct URL: <a href="${url}" target="_blank" style="color: #38bdf8;">${url}</a>
-          </div>
-        `;
-      } catch (err) {
-        resultDiv.innerHTML = '<span style="color: #ef4444;">Error executing request: ' + err.message + '</span>';
-      }
-    }
-
-    async function broadcastGlobalPurge() {
-      if (!confirm('Broadcast Cache Purge to ALL 4 Edge Servers (Mumbai, Singapore, Frankfurt, New York)?')) return;
-      try {
-        const res = await fetch('/cdn/purge', {
-          method: 'POST',
+        const res = await fetch('/cdn/config', {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ all: true })
+          body: JSON.stringify({ strategy: val })
         });
         const data = await res.json();
-        alert('Global purge complete! Edge nodes purged: ' + Object.keys(data.results).join(', '));
-        location.reload();
-      } catch (err) {
-        alert('Global purge failed: ' + err.message);
-      }
-    }
-
-    async function triggerHealthCheck() {
-      try {
-        await fetch('/api/router/health-check', { method: 'POST' });
-        location.reload();
-      } catch (err) {
-        alert('Probe error: ' + err.message);
+        if (res.ok) {
+          msg.innerText = 'Updated to ' + data.strategy;
+          msg.style.color = '#34d399';
+          setTimeout(() => location.reload(), 600);
+        } else {
+          msg.innerText = 'Error: ' + data.error;
+          msg.style.color = '#ef4444';
+        }
+      } catch (e) {
+        msg.innerText = 'Error: ' + e.message;
+        msg.style.color = '#ef4444';
       }
     }
   </script>
 </body>
 </html>
-
