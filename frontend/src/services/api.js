@@ -239,12 +239,84 @@ export async function executeDirectEdgeRequest(port, filename) {
 }
 
 /**
+ * Fetch global metrics overview from the backend metrics module
+ */
+export async function fetchMetricsOverview() {
+  try {
+    const res = await fetch(`${ROUTER_URL}/api/metrics/overview`, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch per-edge metrics from the backend metrics module
+ */
+export async function fetchMetricsEdges() {
+  try {
+    const res = await fetch(`${ROUTER_URL}/api/metrics/edges`, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.edges || []);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch recent request history from the backend metrics module
+ */
+export async function fetchMetricsRequests(limit = 50) {
+  try {
+    const res = await fetch(`${ROUTER_URL}/api/metrics/requests?limit=${limit}`, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.requests || []);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch bandwidth distribution metrics
+ */
+export async function fetchMetricsBandwidth() {
+  try {
+    const res = await fetch(`${ROUTER_URL}/api/metrics/bandwidth`, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch cache efficiency metrics
+ */
+export async function fetchMetricsCache() {
+  try {
+    const res = await fetch(`${ROUTER_URL}/api/metrics/cache`, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch unified CDN network snapshot
  */
 export async function fetchFullNetworkSnapshot() {
-  const [origin, router, ...edgeResults] = await Promise.all([
+  const [origin, router, metricsOverview, metricsEdges, metricsRequests, metricsBandwidth, metricsCache, ...edgeResults] = await Promise.all([
     fetchOriginData(),
     fetchRouterData(),
+    fetchMetricsOverview(),
+    fetchMetricsEdges(),
+    fetchMetricsRequests(30),
+    fetchMetricsBandwidth(),
+    fetchMetricsCache(),
     ...EDGE_PORTS.map(p => fetchEdgeStats(p))
   ]);
 
@@ -252,6 +324,13 @@ export async function fetchFullNetworkSnapshot() {
     timestamp: new Date().toISOString(),
     origin,
     router,
+    metrics: {
+      overview: metricsOverview,
+      edges: metricsEdges,
+      requests: metricsRequests,
+      bandwidth: metricsBandwidth,
+      cache: metricsCache
+    },
     edges: edgeResults
   };
 }

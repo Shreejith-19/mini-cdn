@@ -193,3 +193,4 @@ export default function EdgeNodesGrid({ edges = [], onActionSuccess }) {
     </div>
   );
 }
+

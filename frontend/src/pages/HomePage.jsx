@@ -1,115 +1,85 @@
 import React from 'react';
-import { Server, Globe, Zap, Cpu, CheckCircle2 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-
-const sampleChartData = [
-  { time: '00:00', originLatency: 160, edgeLatency: 12 },
-  { time: '04:00', originLatency: 155, edgeLatency: 10 },
-  { time: '08:00', originLatency: 180, edgeLatency: 14 },
-  { time: '12:00', originLatency: 210, edgeLatency: 11 },
-  { time: '16:00', originLatency: 175, edgeLatency: 13 },
-  { time: '20:00', originLatency: 165, edgeLatency: 9 },
-  { time: '24:00', originLatency: 150, edgeLatency: 10 },
-];
+import { RefreshCw, Radio, Server, Activity, Globe } from 'lucide-react';
+import { useCdnData } from '../hooks/useCdnData';
+import MetricsOverview from '../components/MetricsOverview';
+import NetworkControlCards from '../components/NetworkControlCards';
+import RequestSimulator from '../components/RequestSimulator';
+import EdgeNodesGrid from '../components/EdgeNodesGrid';
+import PerformanceCharts from '../charts/PerformanceCharts';
+import DecisionsLog from '../components/DecisionsLog';
 
 export default function HomePage() {
+  const { data, loading, error, refresh, autoRefresh, setAutoRefresh } = useCdnData(3000);
+
+  const origin = data?.origin;
+  const router = data?.router;
+  const edges = data?.edges || [];
+  const metrics = data?.metrics || {};
+  const originFiles = origin?.files || [];
+  const routerDecisions = router?.decisions || [];
+  const metricsRequests = metrics.requests || [];
+
   return (
-    <div className="space-y-6">
-      {/* Verification Banner */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-sky-950/60 via-slate-900 to-indigo-950/60 border border-sky-500/20 backdrop-blur">
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Frontend Initialized Successfully
-            </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Mini CDN Simulator Dashboard</h2>
-            <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-              Vite, React, Tailwind CSS, React Router, Lucide Icons, and Recharts are configured and ready.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Grid of Verified Components */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition">
-          <div className="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-3">
-            <Globe className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-semibold text-white">Vite + React</h3>
-          <p className="text-xs text-slate-400 mt-1">Fast HMR and component rendering verified.</p>
-        </div>
-
-        <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition">
-          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3">
-            <Cpu className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-semibold text-white">Tailwind CSS</h3>
-          <p className="text-xs text-slate-400 mt-1">Utility-first styles and dark UI active.</p>
-        </div>
-
-        <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition">
-          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3">
-            <Zap className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-semibold text-white">Recharts Library</h3>
-          <p className="text-xs text-slate-400 mt-1">Interactive latency charting verified.</p>
-        </div>
-
-        <div className="p-5 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition">
-          <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3">
-            <Server className="w-5 h-5" />
-          </div>
-          <h3 className="text-sm font-semibold text-white">Lucide React</h3>
-          <p className="text-xs text-slate-400 mt-1">Clean SVG vector iconography loaded.</p>
-        </div>
-      </div>
-
-      {/* Chart Verification Card */}
-      <div className="p-6 rounded-xl bg-slate-900/70 border border-slate-800">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-sm font-semibold text-white">Sample Verification Chart (Recharts)</h3>
-            <p className="text-xs text-slate-400">Verifying chart compilation and rendering</p>
-          </div>
-          <div className="flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1.5 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Origin Latency (~160ms)
+    <div className="space-y-6 pb-12">
+      {/* Top Banner / Dashboard Navigation */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-sky-950/60 via-slate-900 to-indigo-950/60 border border-sky-500/20 backdrop-blur">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="flex items-center gap-1.5 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Edge Latency (~10ms)
+            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+              CDN Telemetry Active
             </span>
           </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Mini CDN Simulator Dashboard</h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Real-time edge caching, intelligent routing algorithms, hop latency analysis & failure simulation.
+          </p>
         </div>
 
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sampleChartData}>
-              <defs>
-                <linearGradient id="originGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="edgeGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="time" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} unit="ms" />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
-                itemStyle={{ fontSize: '12px' }}
-              />
-              <Area type="monotone" dataKey="originLatency" stroke="#f59e0b" fillOpacity={1} fill="url(#originGrad)" name="Origin Latency" />
-              <Area type="monotone" dataKey="edgeLatency" stroke="#38bdf8" fillOpacity={1} fill="url(#edgeGrad)" name="Edge Latency" />
-            </AreaChart>
-          </ResponsiveContainer>
+        {/* Live Controls */}
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={e => setAutoRefresh(e.target.checked)}
+              className="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0"
+            />
+            <span>Auto Refresh (3s)</span>
+          </label>
+
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 text-xs font-semibold transition"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
         </div>
       </div>
+
+      {/* Global Real-time Metrics Overview */}
+      <MetricsOverview data={data} />
+
+      {/* Interactive CDN Traffic Simulator */}
+      <RequestSimulator originFiles={originFiles} onActionSuccess={refresh} />
+
+      {/* Central Network Controls: CDN Router & Origin Server */}
+      <NetworkControlCards origin={origin} router={router} onActionSuccess={refresh} />
+
+      {/* 4 Independent Edge Nodes (Mumbai, Singapore, Frankfurt, New York) */}
+      <EdgeNodesGrid edges={router?.edges || []} onActionSuccess={refresh} />
+
+      {/* Latency & Cache Analytics Charts */}
+      <PerformanceCharts edges={router?.edges || []} metrics={metrics} />
+
+      {/* Live Request Stream & Routing Decision Audit Log */}
+      <DecisionsLog requests={metricsRequests} decisions={routerDecisions} />
     </div>
   );
 }
-
