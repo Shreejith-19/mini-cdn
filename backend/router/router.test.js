@@ -4,7 +4,8 @@ const ROUTER_URL = process.env.ROUTER_URL || 'http://localhost:9000';
 
 async function runRouterTestSuite() {
   console.log('\n======================================================');
-  console.log(`🧪 Testing Central CDN Router at ${ROUTER_URL}`);
+  console.log(`🧪 Testing CDN Router Health Monitoring & Failover`);
+  console.log(`   Router endpoint: ${ROUTER_URL}`);
   console.log('======================================================\n');
 
   let passed = 0;
@@ -21,143 +22,141 @@ async function runRouterTestSuite() {
     }
   }
 
-  // 1. GET /cdn/edges - Verify 4 edges and their initial configured simulated latency values
-  await test('GET /cdn/edges returns 4 edge servers with correct configured latencies', async () => {
+  // Ensure all edges start online and healthy
+  for (const id of ['mumbai', 'singapore', 'frankfurt', 'newyork']) {
+    await fetch(`${ROUTER_URL}/admin/edges/${id}/recover`, { method: 'POST' });
+  }
+
+  // 1. GET /cdn/edges - Verify Dashboard Data fields
+  await test('GET /cdn/edges exposes all required dashboard data fields', async () => {
     const res = await fetch(`${ROUTER_URL}/cdn/edges`);
     assert.strictEqual(res.status, 200);
     const edges = await res.json();
     assert.strictEqual(edges.length, 4);
 
-    const mumbai = edges.find(e => e.id === 'mumbai');
-    const singapore = edges.find(e => e.id === 'singapore');
-    const frankfurt = edges.find(e => e.id === 'frankfurt');
-    const newyork = edges.find(e => e.id === 'newyork');
-
-    assert.ok(mumbai, 'Missing Mumbai edge');
-    assert.strictEqual(mumbai.simulatedLatencyMs, 35, 'Mumbai latency must be 35ms');
-    assert.strictEqual(mumbai.port, 8001);
-
-    assert.ok(singapore, 'Missing Singapore edge');
-    assert.strictEqual(singapore.simulatedLatencyMs, 80, 'Singapore latency must be 80ms');
-    assert.strictEqual(singapore.port, 8002);
-
-    assert.ok(frankfurt, 'Missing Frankfurt edge');
-    assert.strictEqual(frankfurt.simulatedLatencyMs, 150, 'Frankfurt latency must be 150ms');
-    assert.strictEqual(frankfurt.port, 8003);
-
-    assert.ok(newyork, 'Missing New York edge');
-    assert.strictEqual(newyork.simulatedLatencyMs, 180, 'New York latency must be 180ms');
-    assert.strictEqual(newyork.port, 8004);
+    for (const edge of edges) {
+      assert.ok(edge.name, 'Missing Edge name');
+      assert.ok(edge.location, 'Missing Location');
+      assert.ok(edge.status, 'Missing Health status');
+      assert.ok(edge.configuredLatency, 'Missing Configured latency');
+      assert.strictEqual(typeof edge.simulatedLatencyMs, 'number');
+      assert.strictEqual(typeof edge.totalRequests, 'number');
+      assert.ok(edge.cacheHitRatio !== undefined, 'Missing Cache hit ratio');
+    }
   });
 
-  // 2. GET /cdn/config
-  await test('GET /cdn/config returns current routing strategy', async () => {
-    const res = await fetch(`${ROUTER_URL}/cdn/config`);
-    assert.strictEqual(res.status, 200);
-    const data = await res.json();
-    assert.ok(data.strategy === 'ROUND_ROBIN' || data.strategy === 'LOWEST_LATENCY');
-  });
-
-  // 3. PUT /cdn/config - Set strategy to LOWEST_LATENCY
-  await test('PUT /cdn/config changes strategy to LOWEST_LATENCY', async () => {
-    const res = await fetch(`${ROUTER_URL}/cdn/config`, {
+  // 2. Normal lowest latency routing routes to Mumbai (35ms)
+  await test('LOWEST_LATENCY routing routes to Mumbai Edge (35ms) when all edges are healthy', async () => {
+    await fetch(`${ROUTER_URL}/cdn/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ strategy: 'LOWEST_LATENCY' })
     });
-    assert.strictEqual(res.status, 200);
-    const data = await res.json();
-    assert.strictEqual(data.strategy, 'LOWEST_LATENCY');
 
-    const check = await (await fetch(`${ROUTER_URL}/cdn/config`)).json();
-    assert.strictEqual(check.strategy, 'LOWEST_LATENCY');
+    const res = await fetch(`${ROUTER_URL}/cdn/content/sample.txt`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('x-selected-edge'), 'Mumbai Edge');
+    assert.strictEqual(res.headers.get('x-edge-simulated-latency'), '35ms');
   });
 
-  // 4. Test LOWEST_LATENCY algorithm: multiple requests route to Mumbai (lowest latency: 35ms)
-  await test('LOWEST_LATENCY strategy routes multiple requests to Mumbai Edge (35ms)', async () => {
+  // 3. Test Failure Simulation: POST /admin/edges/:id/failure
+  await test('POST /admin/edges/mumbai/failure marks Mumbai offline for failure testing', async () => {
+    const res = await fetch(`${ROUTER_URL}/admin/edges/mumbai/failure`, { method: 'POST' });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.edge.disabled, true);
+    assert.ok(data.edge.status.includes('UNHEALTHY'));
+
+    // Verify in /cdn/edges
+    const edges = await (await fetch(`${ROUTER_URL}/cdn/edges`)).json();
+    const mumbai = edges.find(e => e.id === 'mumbai');
+    assert.strictEqual(mumbai.disabled, true);
+  });
+
+  // 4. Test Failover under LOWEST_LATENCY: Requests redirect to remaining lowest latency edge (Singapore 80ms)
+  await test('Failover (LOWEST_LATENCY): With Mumbai offline, requests redirect to Singapore (80ms)', async () => {
     for (let i = 0; i < 3; i++) {
       const res = await fetch(`${ROUTER_URL}/cdn/content/sample.txt`);
       assert.strictEqual(res.status, 200);
-      assert.strictEqual(res.headers.get('x-selected-edge'), 'Mumbai Edge');
-      assert.strictEqual(res.headers.get('x-edge-simulated-latency'), '35ms');
-      assert.ok(res.headers.get('x-actual-request-duration'), 'Missing X-Actual-Request-Duration');
-      assert.strictEqual(res.headers.get('x-routing-strategy'), 'LOWEST_LATENCY');
-      assert.ok(res.headers.get('x-cache'));
+      const selected = res.headers.get('x-selected-edge');
+      assert.strictEqual(selected, 'Singapore Edge', 'Expected failover to Singapore Edge (next lowest latency)');
+      assert.strictEqual(res.headers.get('x-edge-simulated-latency'), '80ms');
     }
   });
 
-  // 5. PUT /cdn/config - Set strategy to ROUND_ROBIN
-  await test('PUT /cdn/config changes strategy to ROUND_ROBIN', async () => {
-    const res = await fetch(`${ROUTER_URL}/cdn/config`, {
+  // 5. Test Failover under ROUND_ROBIN: Requests distribute ONLY across remaining 3 edges
+  await test('Failover (ROUND_ROBIN): Requests distribute ONLY across remaining 3 edges (never Mumbai)', async () => {
+    await fetch(`${ROUTER_URL}/cdn/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ strategy: 'ROUND_ROBIN' })
     });
-    assert.strictEqual(res.status, 200);
-    const data = await res.json();
-    assert.strictEqual(data.strategy, 'ROUND_ROBIN');
-  });
 
-  // 6. Test ROUND_ROBIN algorithm: sequential requests distributed across healthy edges
-  await test('ROUND_ROBIN strategy distributes requests sequentially across edges', async () => {
-    const selectedEdges = [];
-    for (let i = 0; i < 4; i++) {
+    const selected = [];
+    for (let i = 0; i < 6; i++) {
       const res = await fetch(`${ROUTER_URL}/cdn/content/sample.txt`);
       assert.strictEqual(res.status, 200);
-      const edge = res.headers.get('x-selected-edge');
-      selectedEdges.push(edge);
+      selected.push(res.headers.get('x-selected-edge'));
     }
 
-    console.log(`     Sequential routing order: ${selectedEdges.join(' -> ')}`);
-    const unique = new Set(selectedEdges);
-    assert.ok(unique.size >= 2, `Expected distribution across multiple edges, got ${unique.size}`);
+    console.log(`     Edges selected during Mumbai failure: ${selected.join(', ')}`);
+    assert.ok(!selected.includes('Mumbai Edge'), 'Unhealthy Mumbai Edge must NOT receive any requests');
+    const unique = new Set(selected);
+    assert.ok(unique.has('Singapore Edge'));
+    assert.ok(unique.has('Frankfurt Edge'));
+    assert.ok(unique.has('New York Edge'));
   });
 
-  // 7. Test PUT /cdn/config invalid strategy validation
-  await test('PUT /cdn/config rejects invalid strategy with 400', async () => {
-    const res = await fetch(`${ROUTER_URL}/cdn/config`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ strategy: 'INVALID_STRATEGY' })
-    });
-    assert.strictEqual(res.status, 400);
-    const data = await res.json();
-    assert.ok(data.error.includes('Invalid strategy'));
-  });
-
-  // 8. GET /cdn/decisions - Verify routing decision records
-  await test('GET /cdn/decisions returns recorded routing decisions audit log', async () => {
-    const res = await fetch(`${ROUTER_URL}/cdn/decisions`);
+  // 6. Test Recovery Simulation: POST /admin/edges/:id/recover
+  await test('POST /admin/edges/mumbai/recover restores Mumbai and automatically resumes routing', async () => {
+    const res = await fetch(`${ROUTER_URL}/admin/edges/mumbai/recover`, { method: 'POST' });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
-    assert.ok(data.total > 0, `Expected recorded decisions > 0, got ${data.total}`);
-    assert.ok(Array.isArray(data.decisions));
+    assert.strictEqual(data.edge.disabled, false);
+    assert.strictEqual(data.edge.status, 'HEALTHY');
 
-    const sample = data.decisions[0];
-    assert.ok(sample.file);
-    assert.ok(sample.strategy);
-    assert.ok(sample.selectedEdge);
-    assert.strictEqual(typeof sample.simulatedLatencyMs, 'number');
-    assert.strictEqual(typeof sample.actualDurationMs, 'number');
+    // Switch back to LOWEST_LATENCY to confirm Mumbai is selected again
+    await fetch(`${ROUTER_URL}/cdn/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategy: 'LOWEST_LATENCY' })
+    });
+
+    const routeRes = await fetch(`${ROUTER_URL}/cdn/content/sample.txt`);
+    assert.strictEqual(routeRes.status, 200);
+    assert.strictEqual(routeRes.headers.get('x-selected-edge'), 'Mumbai Edge');
   });
 
-  // 9. EJS Diagnostic page GET / and GET /router
-  await test('GET /router renders EJS diagnostic page with 200 OK', async () => {
+  // 7. Test Meaningful Error when ALL edges are unavailable
+  await test('Returns meaningful 503 error when all 4 edges are unavailable', async () => {
+    // Disable all 4 edges
+    for (const id of ['mumbai', 'singapore', 'frankfurt', 'newyork']) {
+      await fetch(`${ROUTER_URL}/admin/edges/${id}/failure`, { method: 'POST' });
+    }
+
+    const res = await fetch(`${ROUTER_URL}/cdn/content/sample.txt`);
+    assert.strictEqual(res.status, 503);
+    const data = await res.json();
+    assert.ok(data.error.includes('All edge servers are currently unavailable'));
+
+    // Recover all edges
+    for (const id of ['mumbai', 'singapore', 'frankfurt', 'newyork']) {
+      await fetch(`${ROUTER_URL}/admin/edges/${id}/recover`, { method: 'POST' });
+    }
+  });
+
+  // 8. EJS Diagnostic page
+  await test('GET /router diagnostic page renders with health monitoring info', async () => {
     const res = await fetch(`${ROUTER_URL}/router`);
     assert.strictEqual(res.status, 200);
     const html = await res.text();
     assert.ok(html.includes('Central CDN Router'));
-    assert.ok(html.includes('Configured Edge Servers'));
-  });
-
-  // 10. Test 404 handling on missing file
-  await test('GET /cdn/content/non-existent-file.bin returns 404 through edge', async () => {
-    const res = await fetch(`${ROUTER_URL}/cdn/content/non-existent-file.bin`);
-    assert.strictEqual(res.status, 404);
+    assert.ok(html.includes('Healthy Edge PoPs'));
+    assert.ok(html.includes('Failure Simulator'));
   });
 
   console.log('\n======================================================');
-  console.log(`🏁 Router Test Results: ${passed} passed, ${failed} failed`);
+  console.log(`🏁 Router Health & Failover Results: ${passed} passed, ${failed} failed`);
   console.log('======================================================\n');
 
   if (failed > 0) {

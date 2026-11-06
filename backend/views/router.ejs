@@ -20,7 +20,7 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text-main); padding: 2rem 1.5rem; line-height: 1.5; }
-    .container { max-width: 1100px; margin: 0 auto; }
+    .container { max-width: 1200px; margin: 0 auto; }
     header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
     .badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; }
     .badge-green { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
@@ -42,6 +42,10 @@
     .code { font-family: monospace; background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
     .btn { background: var(--accent); color: #0f172a; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; font-size: 0.85rem; }
     .btn:hover { opacity: 0.9; }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.35rem 0.8rem; font-size: 0.8rem; border-radius: 6px; cursor: pointer; }
+    .btn-danger:hover { background: #ef4444; color: #fff; }
+    .btn-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.35rem 0.8rem; font-size: 0.8rem; border-radius: 6px; cursor: pointer; }
+    .btn-success:hover { background: #10b981; color: #fff; }
     .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
     .btn-secondary:hover { color: var(--text-main); border-color: var(--text-muted); }
     .nav-links { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
@@ -58,7 +62,7 @@
           <span class="badge badge-green"><span class="pulse-dot"></span> Port <%= port %> ONLINE</span>
         </h1>
         <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem;">
-          Forwards client requests to Mumbai (:8001), Singapore (:8002), Frankfurt (:8003), New York (:8004)
+          Health monitoring, failover, and routing across Mumbai (:8001), Singapore (:8002), Frankfurt (:8003), New York (:8004)
         </p>
       </div>
       <div class="nav-links">
@@ -72,23 +76,25 @@
     <!-- Key Metrics Grid -->
     <div class="grid-4">
       <div class="card">
-        <div class="card-title">Routing Strategy</div>
-        <div class="card-value" style="color: #38bdf8; font-size: 1.4rem;">
+        <div class="card-title">Active Strategy</div>
+        <div class="card-value" style="color: #38bdf8; font-size: 1.35rem;">
           <%= strategy %>
         </div>
         <div class="card-sub">ROUND_ROBIN or LOWEST_LATENCY</div>
       </div>
 
       <div class="card">
-        <div class="card-title">Configured Edges</div>
-        <div class="card-value"><%= edges.length %> PoPs</div>
-        <div class="card-sub"><%= edges.filter(e => e.status === 'HEALTHY').length %> healthy &bull; <%= edges.filter(e => e.status === 'UNHEALTHY').length %> down</div>
+        <div class="card-title">Healthy Edge PoPs</div>
+        <div class="card-value" style="color: #34d399;">
+          <%= edges.filter(e => !e.disabled && e.status === 'HEALTHY').length %> / <%= edges.length %>
+        </div>
+        <div class="card-sub">Available for routing</div>
       </div>
 
       <div class="card">
-        <div class="card-title">Total Decisions Recorded</div>
+        <div class="card-title">Routing Decisions</div>
         <div class="card-value"><%= decisions.length %></div>
-        <div class="card-sub">Live audit trail in memory</div>
+        <div class="card-sub">Recorded in memory</div>
       </div>
 
       <div class="card">
@@ -100,33 +106,37 @@
 
     <!-- Strategy Switching Control -->
     <div class="card" style="margin-bottom: 2rem;">
-      <h2 class="section-title">⚙️ Change Active Routing Strategy</h2>
+      <h2 class="section-title">⚙️ Routing Strategy Configuration</h2>
       <p style="font-size: 0.85rem; color: var(--text-muted);">
         Select routing algorithm applied to incoming <code>/cdn/content/:filename</code> requests:
       </p>
       <div class="strategy-control">
         <select id="strategySelect">
-          <option value="ROUND_ROBIN" <%= strategy === 'ROUND_ROBIN' ? 'selected' : '' %>>1. Round Robin (Sequential distribution)</option>
-          <option value="LOWEST_LATENCY" <%= strategy === 'LOWEST_LATENCY' ? 'selected' : '' %>>2. Lowest Simulated Latency (Mumbai 35ms)</option>
+          <option value="ROUND_ROBIN" <%= strategy === 'ROUND_ROBIN' ? 'selected' : '' %>>1. Round Robin (Sequential distribution across healthy edges)</option>
+          <option value="LOWEST_LATENCY" <%= strategy === 'LOWEST_LATENCY' ? 'selected' : '' %>>2. Lowest Simulated Latency (Mumbai 35ms -> Singapore 80ms -> Frankfurt 150ms -> NYC 180ms)</option>
         </select>
         <button class="btn" onclick="updateStrategy()">Update Strategy (PUT /cdn/config)</button>
         <span id="strategyMsg" style="font-size: 0.85rem;"></span>
       </div>
     </div>
 
-    <!-- Edge Servers Table with Configured Simulated Latencies -->
+    <!-- Edge Health & Failure Simulation Table -->
     <div class="card" style="margin-bottom: 2rem;">
-      <h2 class="section-title">⚡ Configured Edge Servers (4 Nodes)</h2>
+      <div class="section-title">
+        <span>⚡ Edge Servers Health &amp; Failure Simulator</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Simulate an edge failure to verify automatic failover</span>
+      </div>
       <table>
         <thead>
           <tr>
             <th>Edge Name</th>
             <th>Location</th>
             <th>Port</th>
-            <th>Configured Simulated Latency</th>
-            <th>Status</th>
-            <th>Requests Routed</th>
-            <th>Diagnostics Link</th>
+            <th>Configured Latency</th>
+            <th>Health Status</th>
+            <th>Total Requests</th>
+            <th>Hit Ratio</th>
+            <th>Failure Simulation</th>
           </tr>
         </thead>
         <tbody>
@@ -139,13 +149,22 @@
                 <strong style="color: #38bdf8;"><%= edge.simulatedLatencyMs %> ms</strong>
               </td>
               <td>
-                <span class="badge <%= edge.status === 'HEALTHY' ? 'badge-green' : 'badge-red' %>">
-                  <%= edge.status %>
-                </span>
+                <% if (edge.disabled) { %>
+                  <span class="badge badge-red">OFFLINE (SIMULATED)</span>
+                <% } else if (edge.status === 'HEALTHY') { %>
+                  <span class="badge badge-green">HEALTHY</span>
+                <% } else { %>
+                  <span class="badge badge-red"><%= edge.status %></span>
+                <% } %>
               </td>
-              <td><strong><%= edge.requestsRouted || 0 %></strong></td>
+              <td><strong><%= edge.totalRequests || edge.requestsRouted || 0 %></strong></td>
+              <td><span class="code"><%= edge.cacheHitRatio || '0.0%' %></span></td>
               <td>
-                <a href="<%= edge.url %>/" target="_blank">View Edge Diagnostics ↗</a>
+                <% if (edge.disabled) { %>
+                  <button class="btn-success" onclick="toggleEdge('<%= edge.id %>', 'recover')">Restore Online</button>
+                <% } else { %>
+                  <button class="btn-danger" onclick="toggleEdge('<%= edge.id %>', 'failure')">Simulate Failure</button>
+                <% } %>
               </td>
             </tr>
           <% }); %>
@@ -161,7 +180,7 @@
           <tr>
             <th>Time</th>
             <th>File</th>
-            <th>Strategy Used</th>
+            <th>Strategy</th>
             <th>Selected Edge</th>
             <th>Simulated Latency</th>
             <th>Actual HTTP Duration</th>
@@ -211,7 +230,7 @@
         if (res.ok) {
           msg.innerText = 'Updated to ' + data.strategy;
           msg.style.color = '#34d399';
-          setTimeout(() => location.reload(), 600);
+          setTimeout(() => location.reload(), 500);
         } else {
           msg.innerText = 'Error: ' + data.error;
           msg.style.color = '#ef4444';
@@ -219,6 +238,20 @@
       } catch (e) {
         msg.innerText = 'Error: ' + e.message;
         msg.style.color = '#ef4444';
+      }
+    }
+
+    async function toggleEdge(edgeId, action) {
+      try {
+        const res = await fetch('/admin/edges/' + edgeId + '/' + action, { method: 'POST' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          const data = await res.json();
+          alert('Action failed: ' + (data.error || res.statusText));
+        }
+      } catch (e) {
+        alert('Request failed: ' + e.message);
       }
     }
   </script>
