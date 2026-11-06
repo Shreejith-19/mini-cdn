@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Origin Server Diagnostics (:8000)</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f2937;
+      --accent: #38bdf8;
+      --accent-dim: rgba(56, 189, 248, 0.15);
+      --success: #10b981;
+      --danger: #ef4444;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --code-bg: #1e293b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); padding: 2rem 1.5rem; line-height: 1.5; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    .badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; }
+    .badge-green { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px #34d399; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+    .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .card-value { font-size: 2rem; font-weight: 700; color: var(--text-main); }
+    .card-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .section-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; color: #e5e7eb; display: flex; align-items: center; gap: 0.5rem; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 0.75rem 1rem; background: #1f2937; color: #9ca3af; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .code { font-family: monospace; background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+    .btn { background: var(--accent); color: #0f172a; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; font-size: 0.9rem; }
+    .btn:hover { opacity: 0.9; }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 4px; }
+    .btn-danger:hover { background: #ef4444; color: #fff; }
+    .upload-form { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; padding: 1.25rem; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 8px; }
+    input[type=file] { color: var(--text-muted); font-size: 0.9rem; }
+    .nav-links { display: flex; gap: 0.75rem; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem;">
+          🌐 Origin Storage Server
+          <span class="badge badge-green"><span class="pulse-dot"></span> <%= status %> (:8000)</span>
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem;">
+          Backend Authoritative Store &amp; Ingestion Repository
+        </p>
+      </div>
+      <div class="nav-links">
+        <a href="/origin/stats" target="_blank" class="code">GET /origin/stats</a>
+        <a href="/origin/files" target="_blank" class="code">GET /origin/files</a>
+      </div>
+    </header>
+
+    <!-- Required 4 Diagnostic Metrics Cards -->
+    <div class="grid-4">
+      <div class="card">
+        <div class="card-title">Origin Server Status</div>
+        <div class="card-value" style="color: #34d399;"><%= status %></div>
+        <div class="card-sub">Port <%= port %> &bull; Uptime <%= uptimeFormatted %></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Available Files</div>
+        <div class="card-value"><%= filesCount %></div>
+        <div class="card-sub">Stored in local directory</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Requests</div>
+        <div class="card-value"><%= totalRequests %></div>
+        <div class="card-sub"><%= failedRequests %> failed requests</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Bandwidth Served</div>
+        <div class="card-value"><%= bytesServedFormatted %></div>
+        <div class="card-sub"><%= bytesServed %> bytes total egress</div>
+      </div>
+    </div>
+
+    <!-- Upload Form Section -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2 class="section-title">📤 Upload Content to Origin</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted);">
+        Supported formats: <strong>JPG, PNG, WebP, PDF, MP4, TXT, JSON</strong>
+      </p>
+      <form id="uploadForm" class="upload-form" onsubmit="handleUpload(event)">
+        <input type="file" id="fileInput" name="file" required accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.txt,.json">
+        <button type="submit" class="btn">Upload to Storage</button>
+        <span id="uploadStatus" style="font-size: 0.85rem;"></span>
+      </form>
+    </div>
+
+    <!-- Available Files Section -->
+    <div class="card">
+      <h2 class="section-title">📁 Available Origin Files (<%= filesCount %>)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Type</th>
+            <th>Size</th>
+            <th>Last Modified</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (files.length === 0) { %>
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No files currently in storage.</td></tr>
+          <% } else { %>
+            <% files.forEach(function(f) { %>
+              <tr>
+                <td><strong><%= f.filename %></strong></td>
+                <td><span class="code"><%= f.mimeType %></span></td>
+                <td><%= f.sizeFormatted %></td>
+                <td><%= f.lastModified %></td>
+                <td>
+                  <a href="<%= f.url %>" target="_blank" style="margin-right: 1rem;">View File ↗</a>
+                  <button class="btn-danger" onclick="deleteFile('<%= f.filename %>')">Delete</button>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function handleUpload(e) {
+      e.preventDefault();
+      const statusSpan = document.getElementById('uploadStatus');
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files[0]) return;
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      statusSpan.innerText = 'Uploading...';
+      statusSpan.style.color = '#38bdf8';
+
+      try {
+        const res = await fetch('/origin/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+          statusSpan.innerText = 'Upload successful!';
+          statusSpan.style.color = '#34d399';
+          setTimeout(() => location.reload(), 800);
+        } else {
+          statusSpan.innerText = 'Error: ' + (data.error || 'Upload failed');
+          statusSpan.style.color = '#ef4444';
+        }
+      } catch (err) {
+        statusSpan.innerText = 'Error: ' + err.message;
+        statusSpan.style.color = '#ef4444';
+      }
+    }
+
+    async function deleteFile(filename) {
+      if (!confirm('Are you sure you want to delete ' + filename + ' from Origin storage?')) return;
+      try {
+        const res = await fetch('/origin/content/' + encodeURIComponent(filename), {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          location.reload();
+        } else {
+          const data = await res.json();
+          alert('Delete failed: ' + (data.error || res.statusText));
+        }
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
+

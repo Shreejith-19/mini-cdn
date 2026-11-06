@@ -1,0 +1,4 @@
+Hello from Mini CDN Origin Server!
+This is an authoritative text file stored in the origin repository.
+When edge servers receive client requests, they fetch this file and cache it locally.
+

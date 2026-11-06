@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
+import originRouter from './origin/originRouter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,21 +16,16 @@ const startTime = Date.now();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware
+// Core middleware
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Root route rendering EJS view
-app.get('/', (req, res) => {
-  res.render('index', {
-    title: 'Mini CDN Backend Service',
-    message: 'Backend server initialized with Express and EJS view engine.',
-    port: PORT
-  });
-});
+// Mount Origin server router at /origin
+app.use('/origin', originRouter);
 
-// Health check endpoint
+// Global Health check endpoint
 app.get(['/health', '/api/health'], (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -40,11 +36,16 @@ app.get(['/health', '/api/health'], (req, res) => {
   });
 });
 
+// Root route redirects to Origin diagnostic page
+app.get('/', (req, res) => {
+  res.redirect('/origin');
+});
+
 // Start listening if run directly
 const server = app.listen(PORT, () => {
-  console.log(`[Mini CDN Backend] Server running on http://localhost:${PORT}`);
-  console.log(`[Mini CDN Backend] Health endpoint: http://localhost:${PORT}/health`);
+  console.log(`[Mini CDN Origin] Server running on http://localhost:${PORT}`);
+  console.log(`[Mini CDN Origin] Diagnostics: http://localhost:${PORT}/origin`);
+  console.log(`[Mini CDN Origin] Health: http://localhost:${PORT}/health`);
 });
 
 export { app, server };
-

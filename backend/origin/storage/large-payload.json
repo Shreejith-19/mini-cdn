@@ -1,0 +1,27 @@
+{
+  "type": "benchmarking-dataset",
+  "generatedAt": "2026-11-06T15:00:00.000Z",
+  "totalRecords": 100,
+  "records": [
+    { "id": 1, "region": "Asia-South", "city": "Mumbai", "edgePort": 8001, "popStatus": "active", "latencyBenchmarkMs": 8 },
+    { "id": 2, "region": "Asia-Southeast", "city": "Singapore", "edgePort": 8002, "popStatus": "active", "latencyBenchmarkMs": 12 },
+    { "id": 3, "region": "Europe-Central", "city": "Frankfurt", "edgePort": 8003, "popStatus": "active", "latencyBenchmarkMs": 15 },
+    { "id": 4, "region": "US-East", "city": "New York", "edgePort": 8004, "popStatus": "active", "latencyBenchmarkMs": 10 },
+    { "id": 5, "region": "Authoritative-Cloud", "city": "Frankfurt", "edgePort": 8000, "popStatus": "origin", "latencyBenchmarkMs": 150 },
+    { "id": 6, "region": "Asia-South", "city": "Delhi", "edgePort": 8001, "popStatus": "active", "latencyBenchmarkMs": 14 },
+    { "id": 7, "region": "Asia-South", "city": "Bangalore", "edgePort": 8001, "popStatus": "active", "latencyBenchmarkMs": 11 },
+    { "id": 8, "region": "Asia-Southeast", "city": "Kuala Lumpur", "edgePort": 8002, "popStatus": "active", "latencyBenchmarkMs": 18 },
+    { "id": 9, "region": "Asia-Southeast", "city": "Jakarta", "edgePort": 8002, "popStatus": "active", "latencyBenchmarkMs": 22 },
+    { "id": 10, "region": "Europe-West", "city": "London", "edgePort": 8003, "popStatus": "active", "latencyBenchmarkMs": 19 },
+    { "id": 11, "region": "Europe-Central", "city": "Paris", "edgePort": 8003, "popStatus": "active", "latencyBenchmarkMs": 17 },
+    { "id": 12, "region": "Europe-Central", "city": "Amsterdam", "edgePort": 8003, "popStatus": "active", "latencyBenchmarkMs": 16 },
+    { "id": 13, "region": "US-East", "city": "Boston", "edgePort": 8004, "popStatus": "active", "latencyBenchmarkMs": 12 },
+    { "id": 14, "region": "US-East", "city": "Washington DC", "edgePort": 8004, "popStatus": "active", "latencyBenchmarkMs": 14 },
+    { "id": 15, "region": "US-Midwest", "city": "Chicago", "edgePort": 8004, "popStatus": "active", "latencyBenchmarkMs": 24 }
+  ],
+  "cacheDirectives": {
+    "defaultMaxAge": 60,
+    "revalidate": false,
+    "compression": true
+  }
+}

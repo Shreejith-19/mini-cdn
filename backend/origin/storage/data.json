@@ -1,0 +1,8 @@
+{
+  "system": "Mini CDN Origin",
+  "port": 8000,
+  "storagePath": "backend/origin/storage",
+  "supportedFormats": ["jpg", "png", "webp", "pdf", "mp4", "txt", "json"],
+  "status": "online"
+}
+

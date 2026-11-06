@@ -1,0 +1,23 @@
+{
+  "project": "Mini CDN Simulator",
+  "version": "1.0.0",
+  "originRegion": "Central Authoritative Cloud (Port 8000)",
+  "simulatedOrigin": true,
+  "nodes": [
+    { "id": "edge-mumbai", "name": "Mumbai Edge", "port": 8001, "region": "Asia-South" },
+    { "id": "edge-singapore", "name": "Singapore Edge", "port": 8002, "region": "Asia-Southeast" },
+    { "id": "edge-frankfurt", "name": "Frankfurt Edge", "port": 8003, "region": "Europe-Central" },
+    { "id": "edge-newyork", "name": "New York Edge", "port": 8004, "region": "US-East" }
+  ],
+  "cdnRouter": {
+    "port": 9000,
+    "strategies": ["geo-proximity", "latency-based", "round-robin"]
+  },
+  "features": [
+    "Origin Latency Simulation (150ms default)",
+    "Independent Edge In-Memory Caching",
+    "Cache Invalidation & Instant Purge",
+    "Real-time Hit/Miss Telemetry & Analytics"
+  ],
+  "timestamp": "2026-11-06T15:00:00.000Z"
+}

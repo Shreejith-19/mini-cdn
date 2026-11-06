@@ -1,0 +1,14 @@
+====================================================
+  MINI CDN SIMULATOR - CENTRAL AUTHORITATIVE ORIGIN
+====================================================
+
+Content Delivery Networks (CDNs) distribute web assets across a global mesh
+of edge servers (PoPs) to minimize latency for end users.
+
+How content caching works:
+1. Client sends request to CDN Router (:9000).
+2. CDN Router routes client to the closest edge server (Mumbai, Singapore, Frankfurt, or New York).
+3. If the edge has the asset in cache (CACHE HIT), it returns in ~5-15ms.
+4. If the edge does NOT have the asset (CACHE MISS), it queries this Origin (:8000),
+   caches the asset locally, and delivers it to the user.
+5. All subsequent requests in that geographical region are served directly from the Edge!
