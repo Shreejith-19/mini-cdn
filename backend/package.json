@@ -6,9 +6,16 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "start:origin": "node server.js",
+    "start:mumbai": "node edge/edgeServer.js --edge=mumbai",
+    "start:singapore": "node edge/edgeServer.js --edge=singapore",
+    "start:frankfurt": "node edge/edgeServer.js --edge=frankfurt",
+    "start:newyork": "node edge/edgeServer.js --edge=newyork",
+    "start:edges": "node edge/startEdges.js",
     "dev": "node --watch server.js",
     "test": "node verify.js",
-    "test:origin": "node origin/origin.test.js"
+    "test:origin": "node origin/origin.test.js",
+    "test:edge": "node edge/edge.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

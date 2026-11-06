@@ -6,6 +6,7 @@ export const EDGE_PRESETS = {
     id: 'edge-mumbai',
     name: 'Mumbai Edge',
     city: 'Mumbai',
+    location: 'Mumbai, India (Asia-South)',
     region: 'Asia-South',
     port: 8001,
     coordinates: [19.0760, 72.8777],
@@ -15,6 +16,7 @@ export const EDGE_PRESETS = {
     id: 'edge-singapore',
     name: 'Singapore Edge',
     city: 'Singapore',
+    location: 'Singapore (Asia-Southeast)',
     region: 'Asia-Southeast',
     port: 8002,
     coordinates: [1.3521, 103.8198],
@@ -24,6 +26,7 @@ export const EDGE_PRESETS = {
     id: 'edge-frankfurt',
     name: 'Frankfurt Edge',
     city: 'Frankfurt',
+    location: 'Frankfurt, Germany (Europe-Central)',
     region: 'Europe-Central',
     port: 8003,
     coordinates: [50.1109, 8.6821],
@@ -33,6 +36,7 @@ export const EDGE_PRESETS = {
     id: 'edge-newyork',
     name: 'New York Edge',
     city: 'New York',
+    location: 'New York, USA (US-East)',
     region: 'US-East',
     port: 8004,
     coordinates: [40.7128, -74.0060],
@@ -41,11 +45,11 @@ export const EDGE_PRESETS = {
 };
 
 /**
- * Resolves active edge configuration from env vars and CLI flags.
+ * Resolves active edge configuration from CLI arguments, environment variables, or preset key.
  */
-export function resolveEdgeConfig() {
+export function resolveEdgeConfig(overridePresetKey = null) {
   const args = process.argv.slice(2);
-  let presetKey = 'mumbai';
+  let presetKey = overridePresetKey || 'mumbai';
 
   // Check for --edge=flag
   for (const arg of args) {
@@ -56,7 +60,9 @@ export function resolveEdgeConfig() {
 
   // Check for EDGE_ID or PORT env vars
   if (process.env.EDGE_ID) {
-    const found = Object.keys(EDGE_PRESETS).find(k => EDGE_PRESETS[k].id === process.env.EDGE_ID || k === process.env.EDGE_ID);
+    const found = Object.keys(EDGE_PRESETS).find(
+      k => EDGE_PRESETS[k].id === process.env.EDGE_ID || k === process.env.EDGE_ID.toLowerCase()
+    );
     if (found) presetKey = found;
   } else if (process.env.PORT) {
     const port = parseInt(process.env.PORT, 10);
@@ -70,12 +76,13 @@ export function resolveEdgeConfig() {
     id: process.env.EDGE_ID || preset.id,
     name: process.env.EDGE_NAME || preset.name,
     city: preset.city,
+    location: process.env.EDGE_LOCATION || preset.location,
     region: process.env.EDGE_REGION || preset.region,
     port: parseInt(process.env.PORT || process.env.EDGE_PORT || preset.port, 10),
     coordinates: preset.coordinates,
     simulatedLatencyMs: parseInt(process.env.SIMULATED_EDGE_LATENCY_MS || preset.simulatedLatencyMs, 10),
     originUrl: process.env.ORIGIN_URL || 'http://localhost:8000',
-    cacheMaxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || '100', 10),
-    cacheDefaultTtlSec: parseInt(process.env.CACHE_DEFAULT_TTL_SEC || '3600', 10)
+    cacheMaxCapacity: parseInt(process.env.CACHE_MAX_CAPACITY || '100', 10),
+    cacheDefaultTtlSec: parseInt(process.env.CACHE_DEFAULT_TTL_SEC || '60', 10)
   };
 }

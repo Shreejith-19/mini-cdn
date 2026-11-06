@@ -6,10 +6,16 @@
   "scripts": {
     "start:backend": "npm --prefix backend start",
     "start:origin": "npm --prefix backend start",
+    "start:mumbai": "npm --prefix backend run start:mumbai",
+    "start:singapore": "npm --prefix backend run start:singapore",
+    "start:frankfurt": "npm --prefix backend run start:frankfurt",
+    "start:newyork": "npm --prefix backend run start:newyork",
+    "start:edges": "npm --prefix backend run start:edges",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",
     "test:origin": "npm --prefix backend run test:origin",
+    "test:edge": "npm --prefix backend run test:edge",
     "install:all": "npm --prefix backend install && npm --prefix frontend install"
   },
   "keywords": [

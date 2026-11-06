@@ -1,26 +1,27 @@
 /**
- * Independent In-Memory Cache for CDN Edge Servers
+ * Custom In-Memory LRU Cache using JavaScript Map
  * 
- * Each Edge server instance holds its own isolated memory space.
  * Features:
- * - O(1) Map lookups
- * - Time-To-Live (TTL) expiration with lazy and scheduled eviction
- * - Least-Recently-Used (LRU) size-bound eviction
- * - Invalidation & Purge API
- * - Hit and bandwidth telemetry
+ * - JavaScript Map for O(1) lookup and natural LRU key ordering
+ * - Maximum capacity limit (default 100 objects)
+ * - Time-To-Live (TTL) expiration (default 60 seconds)
+ * - Cache hit / miss tracking
+ * - LRU eviction when capacity is reached
+ * - No external dependencies or Redis
  */
 export class InMemoryEdgeCache {
   constructor(options = {}) {
-    this.maxEntries = options.maxEntries || 100;
-    this.defaultTtlSec = options.defaultTtlSec || 3600; // 1 hour default
+    this.maxCapacity = options.maxCapacity || 100;
+    this.defaultTtlSec = options.defaultTtlSec || 60; // 60 seconds default
     this.store = new Map();
-    this.totalEvictions = 0;
+    this.evictionCount = 0;
   }
 
   /**
-   * Retrieves an item from cache.
-   * Updates LRU access ordering and hit counter.
-   * Returns null if key not found or expired.
+   * Cache lookup
+   * If found and valid: updates LRU order and hit count, returns entry.
+   * If expired: deletes entry and returns null.
+   * If not found: returns null.
    */
   get(key) {
     if (!this.store.has(key)) {
@@ -36,7 +37,7 @@ export class InMemoryEdgeCache {
       return null;
     }
 
-    // Refresh LRU ordering: delete and re-insert
+    // Refresh LRU order: delete and re-insert
     this.store.delete(key);
     entry.hits += 1;
     entry.lastAccessed = now;
@@ -46,22 +47,24 @@ export class InMemoryEdgeCache {
   }
 
   /**
-   * Stores an item in the in-memory cache.
-   * Evicts the oldest entry if max capacity is exceeded.
+   * Cache insertion
+   * Stores data buffer, headers, mime type.
+   * Evicts least recently used (LRU) entry if capacity is reached.
    */
   set(key, data) {
     const now = Date.now();
     const ttlSec = typeof data.ttlSec === 'number' ? data.ttlSec : this.defaultTtlSec;
-    const expiresAt = ttlSec > 0 ? now + ttlSec * 1000 : null;
+    const expiresAt = ttlSec > 0 ? now + (ttlSec * 1000) : null;
 
-    // Handle existing key or LRU capacity eviction
+    // If key exists, delete first so it updates insertion order
     if (this.store.has(key)) {
       this.store.delete(key);
-    } else if (this.store.size >= this.maxEntries) {
-      const oldestKey = this.store.keys().next().value;
-      if (oldestKey) {
-        this.store.delete(oldestKey);
-        this.totalEvictions++;
+    } else if (this.store.size >= this.maxCapacity) {
+      // LRU eviction: the first key in Map iterator is the oldest / least recently used
+      const lruKey = this.store.keys().next().value;
+      if (lruKey !== undefined) {
+        this.store.delete(lruKey);
+        this.evictionCount++;
       }
     }
 
@@ -74,7 +77,6 @@ export class InMemoryEdgeCache {
       buffer,
       contentType: data.contentType || 'application/octet-stream',
       headers: data.headers || {},
-      statusCode: data.statusCode || 200,
       size: buffer.length,
       cachedAt: now,
       ttlSec,
@@ -88,69 +90,68 @@ export class InMemoryEdgeCache {
   }
 
   /**
-   * Purges a single entry by key.
+   * Clear the entire cache
    */
-  purge(key) {
-    return this.store.delete(key);
-  }
-
-  /**
-   * Clears all cached entries.
-   */
-  purgeAll() {
+  clear() {
     const count = this.store.size;
     this.store.clear();
     return count;
   }
 
   /**
-   * Returns list of cached items with TTL remaining.
+   * Purge a single key
    */
-  listEntries() {
+  delete(key) {
+    return this.store.delete(key);
+  }
+
+  /**
+   * Return number of valid items in cache
+   */
+  size() {
+    this.cleanupExpired();
+    return this.store.size;
+  }
+
+  /**
+   * Lazily clean up expired items
+   */
+  cleanupExpired() {
+    const now = Date.now();
+    for (const [key, entry] of this.store.entries()) {
+      if (entry.expiresAt && entry.expiresAt <= now) {
+        this.store.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Return list of cached object metadata
+   */
+  getMetadataList() {
+    this.cleanupExpired();
     const now = Date.now();
     const list = [];
 
-    for (const [key, item] of this.store.entries()) {
-      if (item.expiresAt && item.expiresAt <= now) {
-        this.store.delete(key);
-        continue;
-      }
-
-      const ttlRemainingSec = item.expiresAt
-        ? Math.max(0, Math.round((item.expiresAt - now) / 1000))
+    for (const [key, entry] of this.store.entries()) {
+      const ttlRemaining = entry.expiresAt
+        ? Math.max(0, Math.round((entry.expiresAt - now) / 1000))
         : null;
 
       list.push({
-        key: item.key,
-        contentType: item.contentType,
-        size: item.size,
-        sizeFormatted: this.formatBytes(item.size),
-        cachedAt: new Date(item.cachedAt).toISOString(),
-        expiresAt: item.expiresAt ? new Date(item.expiresAt).toISOString() : 'Never',
-        ttlRemainingSec,
-        hits: item.hits,
-        etag: item.headers['etag'] || null
+        key,
+        contentType: entry.contentType,
+        size: entry.size,
+        sizeFormatted: this.formatBytes(entry.size),
+        cachedAt: new Date(entry.cachedAt).toISOString(),
+        expiresAt: entry.expiresAt ? new Date(entry.expiresAt).toISOString() : null,
+        ttlRemainingSeconds: ttlRemaining,
+        hits: entry.hits,
+        etag: entry.headers['etag'] || null
       });
     }
 
     return list;
-  }
-
-  /**
-   * Returns summary statistics.
-   */
-  getStats() {
-    let totalSizeBytes = 0;
-    for (const item of this.store.values()) {
-      totalSizeBytes += item.size;
-    }
-    return {
-      itemCount: this.store.size,
-      maxEntries: this.maxEntries,
-      totalSizeBytes,
-      totalSizeFormatted: this.formatBytes(totalSizeBytes),
-      totalEvictions: this.totalEvictions
-    };
   }
 
   formatBytes(bytes) {

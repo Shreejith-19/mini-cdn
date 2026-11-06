@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= edgeName %> Diagnostics (:<%= port %>)</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --border: #1f2937;
+      --accent: #38bdf8;
+      --accent-dim: rgba(56, 189, 248, 0.15);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --code-bg: #1e293b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); padding: 2rem 1.5rem; line-height: 1.5; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    .badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; }
+    .badge-green { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-hit { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-miss { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px #34d399; }
+    .grid-6 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .card-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .card-value { font-size: 1.75rem; font-weight: 700; color: var(--text-main); }
+    .card-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .section-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; color: #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 0.75rem 1rem; background: #1f2937; color: #9ca3af; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .code { font-family: monospace; background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+    .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.4rem 0.9rem; font-size: 0.85rem; border-radius: 6px; cursor: pointer; }
+    .btn-danger:hover { background: #ef4444; color: #fff; }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+    .btn-secondary:hover { color: var(--text-main); border-color: var(--text-muted); }
+    .nav-links { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    .progress-bar-bg { width: 100%; height: 5px; background: #1e293b; border-radius: 9999px; margin-top: 0.4rem; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: #38bdf8; border-radius: 9999px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1 style="font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem;">
+          ⚡ <%= edgeName %>
+          <span class="badge badge-green"><span class="pulse-dot"></span> <%= serverStatus %> (: <%= port %>)</span>
+        </h1>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem;">
+          Edge Location: <strong><%= edgeLocation %></strong> &bull; Origin: <code><%= originUrl %></code>
+        </p>
+      </div>
+      <div class="nav-links">
+        <a href="/stats" target="_blank" class="code">GET /stats</a>
+        <a href="/cache" target="_blank" class="code">GET /cache</a>
+        <button class="btn-danger" onclick="clearCache()">Clear Cache</button>
+        <button class="btn-secondary" onclick="location.reload()">↻ Refresh</button>
+      </div>
+    </header>
+
+    <!-- Required 6 Diagnostic Metrics Display Cards -->
+    <div class="grid-6">
+      <div class="card">
+        <div class="card-title">Edge Location</div>
+        <div class="card-value" style="font-size: 1.15rem; color: #38bdf8; margin-top: 0.35rem;"><%= edgeLocation %></div>
+        <div class="card-sub">Port <%= port %></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Server Status</div>
+        <div class="card-value" style="color: #34d399;"><%= serverStatus %></div>
+        <div class="card-sub">Active &amp; Ready</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Cache Object Count</div>
+        <div class="card-value"><%= cacheObjectCount %></div>
+        <div class="card-sub">In-Memory LRU items</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Cache Hits</div>
+        <div class="card-value" style="color: #34d399;"><%= cacheHits %></div>
+        <div class="card-sub">Served from memory</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Cache Misses</div>
+        <div class="card-value" style="color: #f59e0b;"><%= cacheMisses %></div>
+        <div class="card-sub">Fetched from origin</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Cache Hit Ratio</div>
+        <div class="card-value" style="color: #38bdf8;"><%= cacheHitRatio %></div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width: <%= cacheHitRatioNumeric %>%;"></div>
+        </div>
+        <div class="card-sub"><%= totalRequests %> total requests</div>
+      </div>
+    </div>
+
+    <!-- Cached Objects Table -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <div class="section-title">
+        <span>💾 Cached Objects (<%= cachedObjects.length %>)</span>
+        <% if (cachedObjects.length > 0) { %>
+          <button class="btn-danger" onclick="clearCache()">Clear All Cache</button>
+        <% } %>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Key / Path</th>
+            <th>Type</th>
+            <th>Size</th>
+            <th>Cache Hits</th>
+            <th>TTL Remaining</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (cachedObjects.length === 0) { %>
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Cache is currently empty. Request a file to observe in-memory caching!</td></tr>
+          <% } else { %>
+            <% cachedObjects.forEach(function(item) { %>
+              <tr>
+                <td><strong><%= item.key %></strong></td>
+                <td><span class="code"><%= item.contentType %></span></td>
+                <td><%= item.sizeFormatted %></td>
+                <td><strong style="color: #34d399;"><%= item.hits %></strong></td>
+                <td><span class="code"><%= item.ttlRemainingSeconds !== null ? item.ttlRemainingSeconds + 's' : 'Permanent' %></span></td>
+                <td>
+                  <a href="/content/<%= item.key.split('/').pop() %>" target="_blank" style="margin-right: 0.75rem;">Fetch ↗</a>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Recent Edge Requests Table -->
+    <div class="card">
+      <div class="section-title">
+        <span>📜 Recent Requests Stream (Last 15)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Path</th>
+            <th>Cache Status</th>
+            <th>Latency</th>
+            <th>HTTP Status</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (recentRequests.length === 0) { %>
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No requests processed yet.</td></tr>
+          <% } else { %>
+            <% recentRequests.forEach(function(req) { %>
+              <tr>
+                <td><%= new Date(req.timestamp).toLocaleTimeString() %></td>
+                <td><strong><%= req.path %></strong></td>
+                <td>
+                  <span class="badge <%= req.cacheStatus === 'HIT' ? 'badge-hit' : 'badge-miss' %>">
+                    <%= req.cacheStatus %>
+                  </span>
+                </td>
+                <td style="color: <%= req.cacheStatus === 'HIT' ? '#34d399' : '#f59e0b' %>;"><%= req.latencyMs %> ms</td>
+                <td><span class="code"><%= req.statusCode %></span></td>
+                <td><%= req.bytesFormatted %></td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function clearCache() {
+      if (!confirm('Clear all in-memory cache on <%= edgeName %>?')) return;
+      try {
+        const res = await fetch('/cache', { method: 'DELETE' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert('Failed to clear cache');
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
