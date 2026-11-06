@@ -431,17 +431,26 @@ export function createRouterApp(customConfig = {}) {
     selectedEdge.totalRequests++;
 
     try {
-      const edgeUrl = `${selectedEdge.url}/content/${encodeURIComponent(safeFilename)}`;
+      const isCacheBypassed = req.query.nocache === 'true' ||
+        req.query.cache === 'false' ||
+        req.headers['x-cache-bypass'] === 'true';
+      const edgeQuery = isCacheBypassed ? '?nocache=true' : '';
+      const edgeUrl = `${selectedEdge.url}/content/${encodeURIComponent(safeFilename)}${edgeQuery}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000); // Edge timeout
 
+      const edgeHeaders = {
+        'X-Forwarded-For': req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1',
+        'If-None-Match': req.headers['if-none-match'] || '',
+        'X-Request-Id': requestId
+      };
+      if (isCacheBypassed) {
+        edgeHeaders['X-Cache-Bypass'] = 'true';
+      }
+
       const edgeRes = await fetch(edgeUrl, {
         signal: controller.signal,
-        headers: {
-          'X-Forwarded-For': req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1',
-          'If-None-Match': req.headers['if-none-match'] || '',
-          'X-Request-Id': requestId
-        }
+        headers: edgeHeaders
       });
       clearTimeout(timeoutId);
 

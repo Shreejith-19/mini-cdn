@@ -149,6 +149,16 @@ async function runSimulatorBackendTests() {
     );
     console.log('  ✓ CORS headers properly exposed for browser JavaScript');
 
+    // TEST 6: Testing CDN Request with Cache Disabled (?nocache=true)
+    console.log('6. Testing CDN Request with Cache Disabled (Forces Origin fetch):');
+    const originCountBefore = originHitCount;
+    const resBypass = await fetch(`${routerUrl}/cdn/content/sample.txt?nocache=true&strategy=LOWEST_LATENCY`);
+    assert.strictEqual(resBypass.status, 200);
+    assert.strictEqual(resBypass.headers.get('x-cache'), 'MISS');
+    assert.strictEqual(resBypass.headers.get('x-origin-contacted'), 'Yes');
+    assert.strictEqual(originHitCount, originCountBefore + 1, 'Origin server must be contacted when nocache=true');
+    console.log('  ✓ Cache bypass verified: Origin contacted on every request when cache disabled');
+
     console.log('\n======================================================');
     console.log('🎉 All Request Simulator backend tests passed cleanly!');
     console.log('======================================================\n');

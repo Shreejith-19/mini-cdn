@@ -1,5 +1,11 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { metricsCollector as defaultCollector } from './metricsCollector.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Creates an Express router exposing the Mini CDN metrics endpoints.
@@ -58,6 +64,33 @@ export function createMetricsRouter(collector = defaultCollector) {
   router.get('/cache', (req, res) => {
     const cache = collector.getCache();
     res.status(200).json(cache);
+  });
+
+  // GET /api/metrics/benchmarks
+  router.get('/benchmarks', async (req, res) => {
+    try {
+      const benchmarkPath = path.resolve(__dirname, '../../benchmarks/benchmark-scenarios.json');
+      if (fs.existsSync(benchmarkPath)) {
+        const raw = fs.readFileSync(benchmarkPath, 'utf8');
+        return res.status(200).json(JSON.parse(raw));
+      }
+      const { runScenarioBenchmarks } = await import('../../benchmarks/loadTest.js');
+      const data = await runScenarioBenchmarks();
+      return res.status(200).json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to read benchmark scenarios', details: err.message });
+    }
+  });
+
+  // POST /api/metrics/benchmarks/run
+  router.post('/benchmarks/run', async (req, res) => {
+    try {
+      const { runScenarioBenchmarks } = await import('../../benchmarks/loadTest.js');
+      const data = await runScenarioBenchmarks(req.body || {});
+      res.status(200).json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to execute Autocannon benchmark', details: err.message });
+    }
   });
 
   return router;

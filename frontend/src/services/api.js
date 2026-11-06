@@ -336,10 +336,39 @@ export async function fetchMetricsCache() {
 }
 
 /**
+ * Fetch 3-scenario performance benchmarks (Autocannon results)
+ */
+export async function fetchBenchmarkScenarios() {
+  try {
+    const res = await fetch(`${ROUTER_URL}/api/metrics/benchmarks`, { signal: AbortSignal.timeout(3500) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Run a live Autocannon benchmark comparing the three scenarios
+ */
+export async function runAutocannonBenchmark(options = {}) {
+  const res = await fetch(`${ROUTER_URL}/api/metrics/benchmarks/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(options)
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || 'Autocannon benchmark execution failed');
+  }
+  return await res.json();
+}
+
+/**
  * Fetch unified CDN network snapshot
  */
 export async function fetchFullNetworkSnapshot() {
-  const [origin, router, metricsOverview, metricsEdges, metricsRequests, metricsBandwidth, metricsCache, ...edgeResults] = await Promise.all([
+  const [origin, router, metricsOverview, metricsEdges, metricsRequests, metricsBandwidth, metricsCache, benchmarks, ...edgeResults] = await Promise.all([
     fetchOriginData(),
     fetchRouterData(),
     fetchMetricsOverview(),
@@ -347,6 +376,7 @@ export async function fetchFullNetworkSnapshot() {
     fetchMetricsRequests(30),
     fetchMetricsBandwidth(),
     fetchMetricsCache(),
+    fetchBenchmarkScenarios(),
     ...EDGE_PORTS.map(p => fetchEdgeStats(p))
   ]);
 
@@ -359,7 +389,8 @@ export async function fetchFullNetworkSnapshot() {
       edges: metricsEdges,
       requests: metricsRequests,
       bandwidth: metricsBandwidth,
-      cache: metricsCache
+      cache: metricsCache,
+      benchmarks
     },
     edges: edgeResults
   };

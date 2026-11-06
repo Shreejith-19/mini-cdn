@@ -161,8 +161,13 @@ export function createEdgeApp(customConfig = {}) {
     const safeFilename = path.basename(req.params.filename);
     const cacheKey = `/origin/content/${safeFilename}`;
 
-    // 1. Check local in-memory cache
-    const cachedEntry = cache.get(cacheKey);
+    // Check if cache bypass is explicitly requested via query parameter or custom bypass header
+    const bypassCache = req.query.nocache === 'true' ||
+      req.query.cache === 'false' ||
+      req.headers['x-cache-bypass'] === 'true';
+
+    // 1. Check local in-memory cache (unless bypassed)
+    const cachedEntry = bypassCache ? null : cache.get(cacheKey);
 
     if (cachedEntry) {
       // CACHE HIT - serve from memory without contacting origin!
@@ -249,16 +254,18 @@ export function createEdgeApp(customConfig = {}) {
         ttlSec = parseInt(maxAgeMatch[1], 10);
       }
 
-      // Store in local in-memory cache
-      cache.set(cacheKey, {
-        buffer,
-        contentType,
-        headers: {
-          etag,
-          'cache-control': cacheControl
-        },
-        ttlSec
-      });
+      // Store in local in-memory cache only if cache is not explicitly bypassed
+      if (!bypassCache) {
+        cache.set(cacheKey, {
+          buffer,
+          contentType,
+          headers: {
+            etag,
+            'cache-control': cacheControl
+          },
+          ttlSec
+        });
+      }
 
       const duration = Date.now() - start;
 

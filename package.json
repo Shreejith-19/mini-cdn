@@ -22,6 +22,7 @@
     "test:router": "npm --prefix backend run test:router",
     "test:metrics": "npm --prefix backend run test:metrics",
     "test:simulator": "npm --prefix backend run test:simulator",
+    "test:load": "node benchmarks/loadTest.js",
     "install:all": "npm --prefix backend install && npm --prefix frontend install"
   },
   "keywords": [
@@ -34,5 +35,8 @@
     "recharts"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "autocannon": "^9.0.0"
+  }
 }
