@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -12,9 +13,10 @@ import {
   Zap,
   RefreshCw
 } from 'lucide-react';
+import RequestSimulator from '../components/RequestSimulator';
 
-// Representative placeholder dataset for requests log
-const placeholderRequests = [
+// Default initial items if no requests have been dispatched yet
+const defaultRequests = [
   { id: 'req-17309102-01', time: '22:31:02', file: 'banner.svg', edge: 'Mumbai Edge', port: 8001, cache: 'HIT', latency: 12, status: 200, size: '3.6 KB' },
   { id: 'req-17309102-02', time: '22:30:58', file: 'data.json', edge: 'Singapore Edge', port: 8002, cache: 'HIT', latency: 18, status: 200, size: '191 B' },
   { id: 'req-17309102-03', time: '22:30:51', file: 'large-payload.json', edge: 'Frankfurt Edge', port: 8003, cache: 'MISS', latency: 154, status: 200, size: '2.1 KB' },
@@ -28,19 +30,41 @@ const placeholderRequests = [
 ];
 
 export default function RequestsPage() {
+  const context = useOutletContext() || {};
+  const { data, refresh } = context;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [edgeFilter, setEdgeFilter] = useState('ALL');
   const [cacheFilter, setCacheFilter] = useState('ALL');
 
-  const filteredRequests = placeholderRequests.filter(req => {
-    const matchesSearch = req.file.toLowerCase().includes(searchTerm.toLowerCase()) || req.id.toLowerCase().includes(searchTerm.toLowerCase());
+  // Pull actual live backend requests
+  const liveRequests = data?.metrics?.requests;
+  const originFiles = data?.origin?.files || [];
+
+  const rawList = liveRequests && liveRequests.length > 0
+    ? liveRequests.map(r => ({
+        id: r.requestId || r.id,
+        time: r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'now',
+        file: r.requestedFilename || r.filename,
+        edge: r.selectedEdge || 'None',
+        cache: r.cacheStatus || 'UNKNOWN',
+        latency: r.responseLatency ?? r.latencyMs ?? 0,
+        status: r.httpStatusCode || r.statusCode || 200,
+        size: r.bytes ? `${r.bytes} B` : '--'
+      }))
+    : defaultRequests;
+
+  const filteredRequests = rawList.filter(req => {
+    const file = req.file || '';
+    const id = req.id || '';
+    const matchesSearch = file.toLowerCase().includes(searchTerm.toLowerCase()) || id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesEdge = edgeFilter === 'ALL' || req.edge.toLowerCase().includes(edgeFilter.toLowerCase());
     const matchesCache = cacheFilter === 'ALL' || req.cache === cacheFilter;
     return matchesSearch && matchesEdge && matchesCache;
   });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -53,12 +77,18 @@ export default function RequestsPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 shadow-sm hover:border-slate-300 transition"
+            onClick={refresh}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 transition"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
+            <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Refresh Stream</span>
           </button>
         </div>
+      </div>
+
+      {/* Interactive Traffic Dispatch Sandbox */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <RequestSimulator originFiles={originFiles} onActionSuccess={refresh} />
       </div>
 
       {/* Filter and Search Bar */}
@@ -189,11 +219,10 @@ export default function RequestsPage() {
 
         {/* Footer info */}
         <div className="bg-slate-50 border-t border-slate-200 px-4 py-2.5 flex items-center justify-between text-xs text-slate-500">
-          <span>Showing {filteredRequests.length} of {placeholderRequests.length} requests</span>
-          <span className="text-[11px]">Bounded in-memory telemetry buffer</span>
+          <span>Showing {filteredRequests.length} of {rawList.length} requests</span>
+          <span className="text-[11px]">Live backend telemetry stream</span>
         </div>
       </div>
     </div>
   );
 }
-

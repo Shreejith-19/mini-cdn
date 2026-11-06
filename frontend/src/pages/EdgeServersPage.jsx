@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Server,
   Zap,
@@ -11,103 +12,89 @@ import {
   RefreshCw,
   HardDrive
 } from 'lucide-react';
+import { simulateEdgeFailure, recoverEdge, clearEdgeCache } from '../services/api';
 
-const initialEdges = [
-  {
-    id: 'mumbai',
-    name: 'Mumbai Edge',
-    city: 'Mumbai',
-    country: 'India',
-    port: 8001,
-    simulatedLatencyMs: 35,
-    status: 'Running',
-    health: 'Healthy',
-    requests: '412,400',
-    hits: '381,000',
-    misses: '31,400',
-    hitRatio: '92.4%',
-    cachedObjects: 84,
-    bytesServed: '1.42 GB',
-    disabled: false
-  },
-  {
-    id: 'singapore',
-    name: 'Singapore Edge',
-    city: 'Singapore',
-    country: 'Singapore',
-    port: 8002,
-    simulatedLatencyMs: 80,
-    status: 'Running',
-    health: 'Healthy',
-    requests: '385,200',
-    hits: '343,200',
-    misses: '42,000',
-    hitRatio: '89.1%',
-    cachedObjects: 76,
-    bytesServed: '1.28 GB',
-    disabled: false
-  },
-  {
-    id: 'frankfurt',
-    name: 'Frankfurt Edge',
-    city: 'Frankfurt',
-    country: 'Germany',
-    port: 8003,
-    simulatedLatencyMs: 150,
-    status: 'Running',
-    health: 'Healthy',
-    requests: '320,800',
-    hits: '278,400',
-    misses: '42,400',
-    hitRatio: '86.8%',
-    cachedObjects: 68,
-    bytesServed: '1.09 GB',
-    disabled: false
-  },
-  {
-    id: 'newyork',
-    name: 'New York Edge',
-    city: 'New York',
-    country: 'United States',
-    port: 8004,
-    simulatedLatencyMs: 180,
-    status: 'Running',
-    health: 'Healthy',
-    requests: '310,550',
-    hits: '264,600',
-    misses: '45,950',
-    hitRatio: '85.2%',
-    cachedObjects: 62,
-    bytesServed: '1.03 GB',
-    disabled: false
-  }
+const defaultEdges = [
+  { id: 'mumbai', name: 'Mumbai Edge', city: 'Mumbai', country: 'India', port: 8001, simulatedLatencyMs: 35 },
+  { id: 'singapore', name: 'Singapore Edge', city: 'Singapore', country: 'Singapore', port: 8002, simulatedLatencyMs: 80 },
+  { id: 'frankfurt', name: 'Frankfurt Edge', city: 'Frankfurt', country: 'Germany', port: 8003, simulatedLatencyMs: 150 },
+  { id: 'newyork', name: 'New York Edge', city: 'New York', country: 'United States', port: 8004, simulatedLatencyMs: 180 },
 ];
 
 export default function EdgeServersPage() {
-  const [edges, setEdges] = useState(initialEdges);
+  const context = useOutletContext() || {};
+  const { data, refresh } = context;
 
-  function toggleEdgeFailure(edgeId) {
-    setEdges(prev =>
-      prev.map(e => {
-        if (e.id === edgeId) {
-          const nextDisabled = !e.disabled;
-          return {
-            ...e,
-            disabled: nextDisabled,
-            status: nextDisabled ? 'Offline (Simulated)' : 'Running',
-            health: nextDisabled ? 'Unhealthy' : 'Healthy'
-          };
-        }
-        return e;
-      })
-    );
+  const [actionLoading, setActionLoading] = useState({});
+
+  const routerEdges = data?.router?.edges || [];
+  const metricsEdges = data?.metrics?.edges || [];
+  const edgeProbeStats = data?.edges || [];
+
+  // Merge router data, metrics data, and probe stats
+  const displayEdges = defaultEdges.map(def => {
+    const rEdge = routerEdges.find(e => e.id === def.id || e.port === def.port) || {};
+    const mEdge = metricsEdges.find(e => e.id === def.id || e.port === def.port) || {};
+    const pEdge = edgeProbeStats.find(e => e.port === def.port)?.stats || {};
+
+    const isDisabled = Boolean(rEdge.disabled || mEdge.disabled);
+    const isHealthy = !isDisabled && (rEdge.healthStatus === 'HEALTHY' || rEdge.status === 'HEALTHY' || mEdge.healthStatus === 'HEALTHY');
+
+    const totalReq = mEdge.requestsHandled || rEdge.totalRequests || pEdge.totalRequests || 0;
+    const hits = mEdge.cacheHits || pEdge.cacheHits || 0;
+    const misses = mEdge.cacheMisses || pEdge.cacheMisses || 0;
+    const hitRatio = mEdge.cacheHitRatioFormatted || rEdge.cacheHitRatio || (totalReq > 0 ? `${((hits / totalReq) * 100).toFixed(1)}%` : '0.0%');
+    const bytes = mEdge.bytesServedFormatted || pEdge.bytesServedFormatted || '0 B';
+    const cachedObjects = pEdge.cachedObjectCount || (hits > 0 ? Math.min(100, hits) : 0);
+
+    return {
+      id: def.id,
+      name: def.name,
+      city: def.city,
+      country: def.country,
+      port: def.port,
+      simulatedLatencyMs: rEdge.simulatedLatencyMs || def.simulatedLatencyMs,
+      disabled: isDisabled,
+      isHealthy,
+      requests: totalReq,
+      hits,
+      misses,
+      hitRatio,
+      bytesServed: bytes,
+      cachedObjects
+    };
+  });
+
+  async function handleToggleFailure(edgeId, isCurrentlyDisabled) {
+    setActionLoading(prev => ({ ...prev, [edgeId]: true }));
+    try {
+      if (isCurrentlyDisabled) {
+        await recoverEdge(edgeId);
+      } else {
+        await simulateEdgeFailure(edgeId);
+      }
+      if (refresh) await refresh();
+    } catch (err) {
+      alert(`Action failed: ${err.message}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [edgeId]: false }));
+    }
   }
 
-  function clearCache(edgeId) {
-    setEdges(prev =>
-      prev.map(e => (e.id === edgeId ? { ...e, cachedObjects: 0 } : e))
-    );
+  async function handleClearCache(port, name) {
+    if (!confirm(`Flush in-memory cache for ${name} (Port ${port})?`)) return;
+    setActionLoading(prev => ({ ...prev, [port]: true }));
+    try {
+      await clearEdgeCache(port);
+      if (refresh) await refresh();
+    } catch (err) {
+      alert(`Clear cache failed: ${err.message}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [port]: false }));
+    }
   }
+
+  const healthyCount = displayEdges.filter(e => e.isHealthy).length;
 
   return (
     <div className="space-y-6">
@@ -121,16 +108,20 @@ export default function EdgeServersPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            All 4 Nodes Operational
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${
+            healthyCount === 4
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${healthyCount === 4 ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            {healthyCount} / 4 Nodes Operational
           </span>
         </div>
       </div>
 
       {/* Edge Fleet Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {edges.map(edge => (
+        {displayEdges.map(edge => (
           <div
             key={edge.id}
             className={`bg-white border rounded-xl p-5 shadow-sm space-y-4 transition-all ${
@@ -164,7 +155,7 @@ export default function EdgeServersPage() {
                   : 'bg-emerald-50 text-emerald-700 border-emerald-200'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${edge.disabled ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
-                {edge.status}
+                {edge.disabled ? 'Offline (Simulated)' : 'Running'}
               </span>
             </div>
 
@@ -196,12 +187,12 @@ export default function EdgeServersPage() {
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${edge.cachedObjects}%` }}
+                  style={{ width: `${Math.min(100, edge.cachedObjects)}%` }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-slate-400">
                 <span>TTL: 60s</span>
-                <span>Hits: {edge.hits} &bull; Misses: {edge.misses}</span>
+                <span>Hits: {edge.hits.toLocaleString()} &bull; Misses: {edge.misses.toLocaleString()}</span>
               </div>
             </div>
 
@@ -210,7 +201,8 @@ export default function EdgeServersPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => toggleEdgeFailure(edge.id)}
+                  disabled={actionLoading[edge.id]}
+                  onClick={() => handleToggleFailure(edge.id, edge.disabled)}
                   className={`px-3 py-1.5 rounded-lg font-medium border transition ${
                     edge.disabled
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm'
@@ -222,7 +214,8 @@ export default function EdgeServersPage() {
 
                 <button
                   type="button"
-                  onClick={() => clearCache(edge.id)}
+                  disabled={actionLoading[edge.port]}
+                  onClick={() => handleClearCache(edge.port, edge.name)}
                   className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium transition"
                   title="Flush Edge LRU Cache"
                 >
@@ -246,4 +239,3 @@ export default function EdgeServersPage() {
     </div>
   );
 }
-
